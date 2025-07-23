@@ -487,7 +487,25 @@
 </head>
 <body>
     <div id="connectionStatus" class="connection-status connected">🟢 Connected</div>
-    <div id="root"></div>
+    
+    <!-- Fallback content in case JavaScript fails -->
+    <div id="root">
+        <div class="container">
+            <div style="text-align: center; margin-bottom: 30px;">
+                <h1 style="font-size: 3em; color: white; margin-bottom: 10px;">🏗️ Product Builder</h1>
+                <p style="font-size: 1.2em; color: rgba(255,255,255,0.9);">Loading game...</p>
+            </div>
+            
+            <div class="entry-form">
+                <h2 style="text-align: center; margin-bottom: 20px;">Welcome!</h2>
+                <input type="text" id="playerNameInput" class="form-input" placeholder="Enter your name">
+                <button onclick="joinGameFromInput()" class="form-button">Join Game</button>
+                <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
+                    If the game doesn't load, please refresh the page.
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_BASE = '/.netlify/functions/product-api';
@@ -829,10 +847,18 @@
         }
 
         function joinGameFromInput() {
+            console.log('joinGameFromInput called');
             const input = document.getElementById('playerNameInput');
             if (input) {
-                playerName = input.value;
-                joinGame();
+                playerName = input.value.trim();
+                console.log('Player name:', playerName);
+                if (playerName) {
+                    joinGame();
+                } else {
+                    alert('Please enter your name');
+                }
+            } else {
+                console.error('Player name input not found!');
             }
         }
 
