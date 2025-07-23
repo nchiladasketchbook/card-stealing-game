@@ -1,0 +1,503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Builder - Admin Panel</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .admin-header {
+            background: white;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 25px;
+            text-align: center;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .login-form, .admin-panel {
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            margin: 0 auto;
+        }
+        
+        .admin-panel {
+            max-width: none;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+            color: #333;
+        }
+        
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+        
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+        
+        .form-button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .form-button:hover {
+            background: #5a6fd8;
+        }
+        
+        .form-button.danger {
+            background: #f44336;
+        }
+        
+        .form-button.danger:hover {
+            background: #d32f2f;
+        }
+        
+        .form-button.success {
+            background: #4CAF50;
+        }
+        
+        .form-button.success:hover {
+            background: #45a049;
+        }
+        
+        .features-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+            margin: 20px 0;
+        }
+        
+        .feature-card {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 20px;
+            border: 2px solid #e1e5e9;
+            transition: all 0.3s;
+        }
+        
+        .feature-card:hover {
+            border-color: #667eea;
+            transform: translateY(-2px);
+        }
+        
+        .feature-name {
+            font-size: 1.2em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            color: #333;
+        }
+        
+        .feature-category {
+            font-size: 0.9em;
+            color: #666;
+            margin-bottom: 15px;
+            padding: 4px 8px;
+            background: #e9ecef;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .feature-actions {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+        
+        .add-feature-form {
+            background: #e8f5e8;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+        }
+        
+        .stats-section {
+            background: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+        
+        .stat-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 2px solid #e1e5e9;
+        }
+        
+        .stat-value {
+            font-size: 2.5rem;
+            font-weight: bold;
+            color: #667eea;
+            margin-bottom: 10px;
+        }
+        
+        .stat-label {
+            font-size: 1rem;
+            color: #666;
+            font-weight: 600;
+        }
+        
+        .hidden {
+            display: none;
+        }
+        
+        .error {
+            color: #f44336;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .success {
+            color: #4CAF50;
+            margin-top: 10px;
+            font-size: 0.9em;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        @media (max-width: 768px) {
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+            
+            .features-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="admin-header">
+            <h1>🏗️ Product Builder - Admin Panel</h1>
+            <p>Manage features and view game analytics</p>
+        </div>
+
+        <!-- Login Form -->
+        <div id="loginForm" class="login-form">
+            <h2 style="text-align: center; margin-bottom: 20px;">Admin Login</h2>
+            <div class="form-group">
+                <label class="form-label">Password:</label>
+                <input type="password" id="adminPassword" class="form-input" placeholder="Enter admin password">
+            </div>
+            <button id="loginButton" class="form-button" style="width: 100%;">Login</button>
+            <div id="loginError" class="error" style="display: none;"></div>
+        </div>
+
+        <!-- Admin Panel -->
+        <div id="adminPanel" class="admin-panel hidden">
+            <!-- Stats Section -->
+            <div class="stats-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                    <h2>Game Statistics</h2>
+                    <div style="display: flex; gap: 15px;">
+                        <button id="downloadButton" class="form-button success">📊 Download Game Data CSV</button>
+                        <button id="refreshStatsButton" class="form-button">🔄 Refresh</button>
+                        <button id="logoutButton" class="form-button danger">Logout</button>
+                    </div>
+                </div>
+                
+                <div id="statsGrid" class="stats-grid">
+                    <div class="loading">Loading statistics...</div>
+                </div>
+            </div>
+
+            <!-- Feature Management -->
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2>Feature Management</h2>
+            </div>
+
+            <!-- Add Feature Form -->
+            <div class="add-feature-form">
+                <h3 style="margin-bottom: 20px;">Add New Feature</h3>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label class="form-label">Feature Name:</label>
+                        <input type="text" id="newFeatureName" class="form-input" placeholder="e.g., Premium Materials">
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Category:</label>
+                        <select id="newFeatureCategory" class="form-input">
+                            <option value="Design">Design</option>
+                            <option value="Technology">Technology</option>
+                            <option value="Performance">Performance</option>
+                            <option value="Support">Support</option>
+                            <option value="Sustainability">Sustainability</option>
+                            <option value="Other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <button id="addFeatureButton" class="form-button success" style="margin-top: 15px;">Add Feature</button>
+                <div id="addFeatureMessage" style="margin-top: 10px;"></div>
+            </div>
+
+            <!-- Features List -->
+            <div id="featuresSection">
+                <h3 style="margin-bottom: 20px;">Current Features</h3>
+                <div id="featuresGrid" class="features-grid">
+                    <div class="loading">Loading features...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/.netlify/functions/product-api';
+        let authToken = null;
+
+        // Login functionality
+        async function login() {
+            const password = document.getElementById('adminPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            try {
+                const response = await fetch(API_BASE + '/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password: password })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    authToken = data.token;
+                    document.getElementById('loginForm').classList.add('hidden');
+                    document.getElementById('adminPanel').classList.remove('hidden');
+                    loadFeatures();
+                    loadStats();
+                } else {
+                    errorDiv.textContent = data.error || 'Login failed';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (error) {
+                errorDiv.textContent = 'Connection error. Please try again.';
+                errorDiv.style.display = 'block';
+                console.error('Login error:', error);
+            }
+        }
+
+        function logout() {
+            authToken = null;
+            document.getElementById('loginForm').classList.remove('hidden');
+            document.getElementById('adminPanel').classList.add('hidden');
+            document.getElementById('adminPassword').value = '';
+            document.getElementById('loginError').style.display = 'none';
+        }
+
+        // Download functionality
+        async function downloadGameData() {
+            try {
+                const response = await fetch(API_BASE + '/admin/download', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'product_builder_data.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    alert('Error downloading game data');
+                }
+            } catch (error) {
+                alert('Connection error. Please try again.');
+                console.error('Download error:', error);
+            }
+        }
+
+        // Statistics loading
+        async function loadStats() {
+            const statsGrid = document.getElementById('statsGrid');
+            
+            try {
+                // For now, show placeholder stats since we don't have specific stats endpoints
+                // In a real implementation, you'd fetch actual game statistics
+                statsGrid.innerHTML = `
+                    <div class="stat-card">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Games Played</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Total Players</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Features Used</div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-value">0</div>
+                        <div class="stat-label">Avg. Game Duration</div>
+                    </div>
+                `;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+                statsGrid.innerHTML = '<div class="error">Error loading statistics</div>';
+            }
+        }
+
+        // Feature management
+        async function loadFeatures() {
+            try {
+                const response = await fetch(API_BASE + '/admin/features', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                const features = await response.json();
+                displayFeatures(features);
+            } catch (error) {
+                console.error('Error loading features:', error);
+                document.getElementById('featuresGrid').innerHTML = '<div class="error">Error loading features</div>';
+            }
+        }
+
+        function displayFeatures(features) {
+            const grid = document.getElementById('featuresGrid');
+            
+            if (features.length === 0) {
+                grid.innerHTML = '<div style="text-align: center; color: #666;">No features found. Add some features to get started.</div>';
+                return;
+            }
+            
+            grid.innerHTML = features.map(function(feature) {
+                return `
+                    <div class="feature-card" data-id="${feature.id}">
+                        <div class="feature-name">${feature.name}</div>
+                        <div class="feature-category">${feature.category || 'Uncategorized'}</div>
+                        <div class="feature-actions">
+                            <button onclick="editFeature(${feature.id})" class="form-button">Edit</button>
+                            <button onclick="deleteFeature(${feature.id})" class="form-button danger">Delete</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function addFeature() {
+            const name = document.getElementById('newFeatureName').value.trim();
+            const category = document.getElementById('newFeatureCategory').value;
+            const messageDiv = document.getElementById('addFeatureMessage');
+            
+            if (!name) {
+                messageDiv.innerHTML = '<div class="error">Please enter a feature name</div>';
+                return;
+            }
+            
+            try {
+                const response = await fetch(API_BASE + '/admin/features', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        name: name,
+                        category: category
+                    })
+                });
+                
+                if (response.ok) {
+                    messageDiv.innerHTML = '<div class="success">Feature added successfully!</div>';
+                    clearAddForm();
+                    loadFeatures();
+                } else {
+                    const error = await response.json();
+                    messageDiv.innerHTML = '<div class="error">' + (error.error || 'Error adding feature') + '</div>';
+                }
+            } catch (error) {
+                messageDiv.innerHTML = '<div class="error">Connection error. Please try again.</div>';
+            }
+        }
+
+        function clearAddForm() {
+            document.getElementById('newFeatureName').value = '';
+            document.getElementById('newFeatureCategory').value = 'Design';
+        }
+
+        async function editFeature(id) {
+            const card = document.querySelector('[data-id="' + id + '"]');
+            const name = card.querySelector('.feature-name').textContent;
+            const category = card.querySelector('.feature-category').textContent;
+            
+            const newName = prompt('Feature name:', name);
+            if (!newName) return;
+            
+            const newCategory = prompt('Category:', category);
+            if (!newCategory) return;
+            
+            try {
+                const response = await fetch(API_BASE + '/admin/features', {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': 'Bearer ' + authToken,

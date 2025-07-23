@@ -1,0 +1,8 @@
+{
+  "name": "product-builder-functions",
+  "version": "1.0.0",
+  "description": "Netlify Functions for Product Builder Game",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.51.0"
+  }
+}
