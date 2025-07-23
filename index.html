@@ -755,20 +755,37 @@
         function showView(viewName) {
             console.log('Showing view:', viewName);
             
-            // Hide all views
+            // Validate that the view exists
+            const targetView = document.getElementById(viewName);
+            if (!targetView) {
+                console.error('View not found:', viewName);
+                return;
+            }
+            
+            // Hide all views first
             const views = ['entryView', 'lobbyView', 'conjointView', 'buildingView', 'resultsView'];
             views.forEach(view => {
                 const el = document.getElementById(view);
                 if (el) {
                     el.classList.add('hidden');
+                    console.log('Hiding view:', view);
+                } else {
+                    console.warn('View element not found:', view);
                 }
             });
 
             // Show the requested view
-            const targetView = document.getElementById(viewName);
-            if (targetView) {
-                targetView.classList.remove('hidden');
-            }
+            targetView.classList.remove('hidden');
+            console.log('Successfully showing view:', viewName);
+            
+            // Verify the view is visible
+            setTimeout(() => {
+                const isVisible = !targetView.classList.contains('hidden');
+                console.log('View visibility check:', viewName, 'visible:', isVisible);
+                if (!isVisible) {
+                    console.error('View failed to show properly:', viewName);
+                }
+            }, 100);
         }
 
         // API calls
@@ -875,80 +892,119 @@
                     gameData = status;
                     currentPlayer = status.players.find(p => p.id === playerId);
                     
-                    console.log('Game status update:', status.stage, 'Previous:', previousStage);
+                    console.log('Game status update:', {
+                        stage: status.stage, 
+                        previousStage,
+                        players: status.players?.length,
+                        timer: status.lobby_timer || status.round_timer
+                    });
                     
-                    // Update game state based on server state
-                    if (status.stage === 'lobby' && gameState !== 'lobby') {
-                        gameState = 'lobby';
-                        showView('lobbyView');
-                        updateLobbyView();
-                    } else if (status.stage === 'conjoint' && gameState !== 'conjoint') {
-                        gameState = 'conjoint';
-                        showView('conjointView');
-                        updateConjointView();
-                    } else if (status.stage === 'building' && gameState !== 'building') {
-                        gameState = 'building';
-                        showView('buildingView');
-                        updateBuildingView();
-                    } else if (status.stage === 'completed' && gameState !== 'results') {
-                        gameState = 'results';
-                        showView('resultsView');
-                        updateResultsView();
-                        clearInterval(updateInterval);
-                        return;
+                    // Handle stage transitions
+                    if (status.stage !== gameState) {
+                        console.log('Stage changed from', gameState, 'to', status.stage);
+                        gameState = status.stage;
+                        
+                        switch (status.stage) {
+                            case 'lobby':
+                                showView('lobbyView');
+                                break;
+                            case 'conjoint':
+                                showView('conjointView');
+                                selectedOption = null; // Reset selection
+                                break;
+                            case 'building':
+                                showView('buildingView');
+                                break;
+                            case 'completed':
+                                showView('resultsView');
+                                clearInterval(updateInterval);
+                                updateResultsView();
+                                return;
+                        }
                     }
                     
-                    // Update current view
-                    if (gameState === 'lobby') updateLobbyView();
-                    else if (gameState === 'conjoint') updateConjointView();
-                    else if (gameState === 'building') updateBuildingView();
+                    // Update current view based on stage
+                    switch (gameState) {
+                        case 'lobby':
+                            updateLobbyView();
+                            break;
+                        case 'conjoint':
+                            updateConjointView();
+                            break;
+                        case 'building':
+                            updateBuildingView();
+                            break;
+                    }
                     
                 } catch (error) {
                     console.error('Failed to update game status:', error);
+                    // Don't clear interval on temporary errors
                 }
             }, gameState === 'lobby' ? 1000 : 2000);
         }
 
         function updateLobbyView() {
-            if (!gameData) return;
+            if (!gameData) {
+                console.log('No game data available for lobby view');
+                return;
+            }
             
             const lobbyTimer = Math.max(0, gameData.lobby_timer || 0);
             const players = gameData.players || [];
             
+            console.log('Updating lobby view:', { lobbyTimer, playerCount: players.length });
+            
             // Update status
             const statusEl = document.getElementById('lobbyStatus');
             if (statusEl) {
-                statusEl.innerHTML = gameData.stage === 'conjoint' 
-                    ? '🚀 Starting now!' 
-                    : `🕐 Starting in ${lobbyTimer} seconds<br><small>Waiting for more players... (${players.filter(p => !p.is_bot).length}/4 real players)</small>`;
+                if (gameData.stage === 'conjoint') {
+                    statusEl.innerHTML = '🚀 Starting now!';
+                } else if (lobbyTimer <= 0) {
+                    statusEl.innerHTML = '🚀 Starting game...';
+                } else {
+                    statusEl.innerHTML = `🕐 Starting in ${lobbyTimer} seconds<br><small>Waiting for more players... (${players.filter(p => !p.is_bot).length}/4 real players)</small>`;
+                }
             }
             
             // Update progress bar
             const progressBar = document.querySelector('#lobbyProgress .progress-bar');
             if (progressBar) {
                 const progress = ((20 - lobbyTimer) / 20) * 100;
-                progressBar.style.width = `${Math.max(0, progress)}%`;
+                progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
             }
             
             // Update players list
             const playersContainer = document.getElementById('playersContainer');
             if (playersContainer) {
-                playersContainer.innerHTML = players.map(player => `
-                    <div class="player-item ${player.id === playerId ? 'current-user' : ''}">
-                        <div style="font-size: 2em; margin-bottom: 10px;">
-                            ${player.is_bot ? '🤖' : player.id === playerId ? '👤 (You)' : '👤'}
+                if (players.length === 0) {
+                    playersContainer.innerHTML = '<div style="text-align: center; color: #666;">Loading players...</div>';
+                } else {
+                    playersContainer.innerHTML = players.map(player => `
+                        <div class="player-item ${player.id === playerId ? 'current-user' : ''}">
+                            <div style="font-size: 2em; margin-bottom: 10px;">
+                                ${player.is_bot ? '🤖' : player.id === playerId ? '👤 (You)' : '👤'}
+                            </div>
+                            <div style="font-weight: bold;">${player.name || 'Unknown'}</div>
+                            <div style="font-size: 0.8em; color: #666;">
+                                ${player.is_bot ? 'Bot' : 'Real Player'}
+                            </div>
                         </div>
-                        <div style="font-weight: bold;">${player.name}</div>
-                        <div style="font-size: 0.8em; color: #666;">
-                            ${player.is_bot ? 'Bot' : 'Real Player'}
-                        </div>
-                    </div>
-                `).join('');
+                    `).join('');
+                }
             }
         }
 
         function updateConjointView() {
-            if (!gameData) return;
+            if (!gameData) {
+                console.log('No game data available for conjoint view');
+                return;
+            }
+            
+            console.log('Updating conjoint view:', { 
+                timer: gameData.round_timer,
+                optionsCount: gameData.product_options?.length,
+                currentChoice: currentPlayer?.conjoint_choice
+            });
             
             // Update timer
             const timerEl = document.getElementById('conjointTimer');
@@ -958,21 +1014,25 @@
             
             // Update product options
             const optionsContainer = document.getElementById('productOptions');
-            if (optionsContainer && gameData.product_options) {
-                const hasSubmitted = currentPlayer?.conjoint_choice !== null;
-                
-                optionsContainer.innerHTML = gameData.product_options.map((option, index) => `
-                    <div class="product-option ${selectedOption === index ? 'selected' : ''}" 
-                         onclick="${hasSubmitted ? '' : `selectOption(${index})`}"
-                         style="${hasSubmitted ? 'opacity: 0.7; cursor: not-allowed;' : ''}">
-                        <h3>${option.name}</h3>
-                        <ul class="feature-list">
-                            ${option.features.map(feature => `<li>${feature}</li>`).join('')}
-                        </ul>
-                        ${hasSubmitted && currentPlayer.conjoint_choice === index ? 
-                            '<div style="margin-top: 10px; color: #28a745; font-weight: bold;">✓ Your Choice</div>' : ''}
-                    </div>
-                `).join('');
+            if (optionsContainer) {
+                if (!gameData.product_options || gameData.product_options.length === 0) {
+                    optionsContainer.innerHTML = '<div style="text-align: center; color: #666;">Loading product options...</div>';
+                } else {
+                    const hasSubmitted = currentPlayer?.conjoint_choice !== null;
+                    
+                    optionsContainer.innerHTML = gameData.product_options.map((option, index) => `
+                        <div class="product-option ${selectedOption === index ? 'selected' : ''}" 
+                             onclick="${hasSubmitted ? '' : `selectOption(${index})`}"
+                             style="${hasSubmitted ? 'opacity: 0.7; cursor: not-allowed;' : ''}">
+                            <h3>${option.name || `Product ${index + 1}`}</h3>
+                            <ul class="feature-list">
+                                ${(option.features || []).map(feature => `<li>${feature}</li>`).join('')}
+                            </ul>
+                            ${hasSubmitted && currentPlayer.conjoint_choice === index ? 
+                                '<div style="margin-top: 10px; color: #28a745; font-weight: bold;">✓ Your Choice</div>' : ''}
+                        </div>
+                    `).join('');
+                }
             }
             
             // Update submit button
@@ -985,7 +1045,16 @@
         }
 
         function updateBuildingView() {
-            if (!gameData) return;
+            if (!gameData) {
+                console.log('No game data available for building view');
+                return;
+            }
+            
+            console.log('Updating building view:', { 
+                timer: gameData.round_timer,
+                availableFeatures: gameData.available_features?.length,
+                playerBoard: currentPlayer?.board?.length
+            });
             
             // Update timer
             const timerEl = document.getElementById('buildingTimer');
@@ -995,13 +1064,18 @@
             
             // Update available features
             const featuresGrid = document.getElementById('featuresGrid');
-            if (featuresGrid && gameData.available_features) {
-                featuresGrid.innerHTML = gameData.available_features.map(feature => `
-                    <div class="feature-tile" draggable="true" 
-                         ondragstart="handleDragStart(event, '${feature}')">
-                        ${feature}
-                    </div>
-                `).join('');
+            if (featuresGrid) {
+                if (!gameData.available_features || gameData.available_features.length === 0) {
+                    featuresGrid.innerHTML = '<div style="text-align: center; color: #666;">No features available</div>';
+                } else {
+                    featuresGrid.innerHTML = gameData.available_features.map(feature => `
+                        <div class="feature-tile" draggable="true" 
+                             ondragstart="handleDragStart(event, '${feature}')"
+                             ondragend="handleDragEnd(event)">
+                            ${feature}
+                        </div>
+                    `).join('');
+                }
             }
             
             // Update player board
@@ -1032,22 +1106,26 @@
             if (otherPlayersContainer && gameData.players) {
                 const otherPlayers = gameData.players.filter(p => p.id !== playerId);
                 
-                otherPlayersContainer.innerHTML = otherPlayers.map(player => `
-                    <div class="other-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
-                        <h4>${player.name} ${player.is_bot ? '🤖' : ''}</h4>
-                        <div class="other-player-features">
-                            ${Array.from({length: 4}, (_, i) => `
-                                <div class="feature-slot ${player.board && player.board[i] ? 'filled' : 'empty'}"
-                                     ${player.board && player.board[i] ? 
-                                       `draggable="true" ondragstart="handleDragStart(event, '${player.board[i]}', '${player.id}')"` : ''}>
-                                    ${player.board && player.board[i] ? player.board[i] : 'Empty'}
-                                </div>
-                            `).join('')}
+                if (otherPlayers.length === 0) {
+                    otherPlayersContainer.innerHTML = '<div style="text-align: center; color: #666;">No other players</div>';
+                } else {
+                    otherPlayersContainer.innerHTML = otherPlayers.map(player => `
+                        <div class="other-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
+                            <h4>${player.name || 'Unknown'} ${player.is_bot ? '🤖' : ''}</h4>
+                            <div class="other-player-features">
+                                ${Array.from({length: 4}, (_, i) => `
+                                    <div class="feature-slot ${player.board && player.board[i] ? 'filled' : 'empty'}"
+                                         ${player.board && player.board[i] ? 
+                                           `draggable="true" ondragstart="handleDragStart(event, '${player.board[i]}', '${player.id}')" ondragend="handleDragEnd(event)"` : ''}>
+                                        ${player.board && player.board[i] ? player.board[i] : 'Empty'}
+                                    </div>
+                                `).join('')}
+                            </div>
+                            ${player.board && player.board.length > 0 ? 
+                                '<div class="steal-hint">Click and drag features to steal them!</div>' : ''}
                         </div>
-                        ${player.board && player.board.length > 0 ? 
-                            '<div class="steal-hint">Click and drag features to steal them!</div>' : ''}
-                    </div>
-                `).join('');
+                    `).join('');
+                }
             }
         }
 
