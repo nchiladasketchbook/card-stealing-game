@@ -194,8 +194,9 @@ exports.handler = async (event, context) => {
       case '/game/conjoint':
         return submitConjointChoice(body);
       
-      case '/game/build':
-        return handleBuildAction(body);
+      case '/game/progress':
+        return progressGame(body);
+      
       
       default:
         return { 
@@ -602,7 +603,178 @@ async function submitConjointChoice(body) {
   }
 }
 
-async function handleBuildAction(body) {
+async function progressGame(body) {
+  try {
+    const { gameId } = body;
+    
+    console.log('Progressing game:', gameId);
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError) throw gameError;
+    
+    const currentTime = Date.now();
+    const gameStartTime = new Date(game.created_at).getTime();
+    const timeSinceStart = (currentTime - gameStartTime) / 1000; // seconds
+    
+    let updatedGame = { ...game };
+    let shouldUpdate = false;
+    
+    if (game.stage === 'lobby') {
+      const lobbyTimer = Math.max(0, 20 - Math.floor(timeSinceStart));
+      
+      if (lobbyTimer !== game.lobby_timer) {
+        updatedGame.lobby_timer = lobbyTimer;
+        shouldUpdate = true;
+      }
+      
+      // If timer reached 0 or we have enough players, advance to conjoint
+      if (lobbyTimer <= 0) {
+        // Fill with bots
+        const players = [...(game.players || [])];
+        const usedNames = players.map(p => p.name);
+        
+        while (players.length < 4) {
+          const bot = createBot(usedNames);
+          players.push(bot);
+          usedNames.push(bot.name);
+        }
+        
+        updatedGame = {
+          ...updatedGame,
+          stage: 'conjoint',
+          players: players,
+          round_timer: 30,
+          lobby_timer: 0,
+          conjoint_start_time: new Date().toISOString()
+        };
+        shouldUpdate = true;
+        
+        console.log('Advanced to conjoint stage with bots');
+        
+        // Process bot conjoint choices immediately
+        setTimeout(() => processBotConjointChoices(gameId), 2000);
+      }
+    } else if (game.stage === 'conjoint') {
+      const conjointStartTime = game.conjoint_start_time ? new Date(game.conjoint_start_time).getTime() : gameStartTime;
+      const timeSinceConjoint = (currentTime - conjointStartTime) / 1000;
+      const roundTimer = Math.max(0, 30 - Math.floor(timeSinceConjoint));
+      
+      if (roundTimer !== game.round_timer) {
+        updatedGame.round_timer = roundTimer;
+        shouldUpdate = true;
+      }
+      
+      // If timer reached 0, advance to building
+      if (roundTimer <= 0) {
+        // Reset player boards and start building
+        const players = game.players.map(player => ({
+          ...player,
+          board: []
+        }));
+        
+        updatedGame = {
+          ...updatedGame,
+          stage: 'building',
+          players: players,
+          round_timer: 60,
+          building_start_time: new Date().toISOString()
+        };
+        shouldUpdate = true;
+        
+        console.log('Advanced to building stage');
+      }
+    } else if (game.stage === 'building') {
+      const buildingStartTime = game.building_start_time ? new Date(game.building_start_time).getTime() : gameStartTime;
+      const timeSinceBuilding = (currentTime - buildingStartTime) / 1000;
+      const roundTimer = Math.max(0, 60 - Math.floor(timeSinceBuilding));
+      
+      if (roundTimer !== game.round_timer) {
+        updatedGame.round_timer = roundTimer;
+        shouldUpdate = true;
+      }
+      
+      // If timer reached 0, end game
+      if (roundTimer <= 0) {
+        updatedGame = await endGame(gameId);
+        shouldUpdate = false; // endGame handles the update
+      }
+    }
+    
+    if (shouldUpdate) {
+      const { error } = await supabase
+        .from('product_games')
+        .update(updatedGame)
+        .eq('id', gameId);
+      
+      if (error) throw error;
+    }
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: true, game: updatedGame })
+    };
+  } catch (error) {
+    return handleError(error, 'Progress game');
+  }
+}
+
+async function endGame(gameId) {
+  try {
+    console.log('Ending game:', gameId);
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError) throw gameError;
+    
+    // Calculate final scores
+    const players = game.players.map(player => {
+      let score = 0;
+      
+      if (player.board) {
+        player.board.forEach(feature => {
+          if (game.feature_stats[feature]) {
+            const stats = game.feature_stats[feature];
+            // Score based on how popular the feature was
+            score += (stats.conjoint_selections * 10) + (stats.build_selections * 5);
+          }
+        });
+      }
+      
+      return { ...player, score };
+    });
+    
+    const updatedGame = {
+      ...game,
+      stage: 'completed',
+      players: players,
+      completed_at: new Date().toISOString(),
+      round_timer: 0
+    };
+    
+    const { error } = await supabase
+      .from('product_games')
+      .update(updatedGame)
+      .eq('id', gameId);
+    
+    if (error) throw error;
+    
+    console.log('Game ended successfully');
+    return updatedGame;
+  } catch (error) {
+    console.error('Error ending game:', error);
+    throw error;
+  }
+}
   try {
     const { gameId, playerId, action, feature, sourcePlayerId, slotIndex } = body;
     
@@ -732,7 +904,7 @@ async function handleBuildAction(body) {
   }
 }
 
-// Bot and game progression functions (simplified for space)
+// Bot and game progression functions
 async function fillWithBotsAndStart(gameId) {
   try {
     console.log('Filling game with bots:', gameId);
@@ -750,28 +922,28 @@ async function fillWithBotsAndStart(gameId) {
     
     // Fill with bots to at least 2 players, max 4
     while (players.length < 4) {
-      players.push(createBot(usedNames));
+      const bot = createBot(usedNames);
+      players.push(bot);
+      usedNames.push(bot.name);
     }
     
-    // Start conjoint stage
+    // Start conjoint stage immediately after adding bots
     const { error } = await supabase
       .from('product_games')
       .update({
         stage: 'conjoint',
         players,
-        round_timer: 30
+        round_timer: 30,
+        lobby_timer: 0
       })
       .eq('id', gameId);
     
     if (error) throw error;
     
-    console.log('Game started with bots');
+    console.log('Game started with bots, moving to conjoint stage');
     
-    // Auto-progress bots in conjoint stage
-    setTimeout(() => processBotConjointChoices(gameId), 5000);
-    
-    // Auto-advance to building after 30 seconds
-    setTimeout(() => startBuildingStage(gameId), 30000);
+    // Process bot conjoint choices immediately
+    await processBotConjointChoices(gameId);
     
   } catch (error) {
     console.error('Error in fillWithBotsAndStart:', error);
@@ -779,11 +951,85 @@ async function fillWithBotsAndStart(gameId) {
 }
 
 async function processBotConjointChoices(gameId) {
-  // Implementation for bot conjoint choices...
-  console.log('Processing bot conjoint choices for game:', gameId);
+  try {
+    console.log('Processing bot conjoint choices for game:', gameId);
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError || !game || game.stage !== 'conjoint') return;
+    
+    const players = game.players.map(player => {
+      if (player.is_bot && player.conjoint_choice === null) {
+        // Bots make random choices with some preference logic
+        const choice = Math.floor(Math.random() * 3);
+        player.conjoint_choice = choice;
+        
+        // Update feature stats
+        const chosenProduct = game.product_options[choice];
+        if (chosenProduct) {
+          chosenProduct.features.forEach(feature => {
+            if (game.feature_stats[feature]) {
+              game.feature_stats[feature].conjoint_selections++;
+            }
+          });
+        }
+      }
+      return player;
+    });
+    
+    const { error } = await supabase
+      .from('product_games')
+      .update({ 
+        players,
+        feature_stats: game.feature_stats
+      })
+      .eq('id', gameId);
+      
+    if (error) throw error;
+    
+    console.log('Bot conjoint choices processed');
+    
+  } catch (error) {
+    console.error('Error processing bot conjoint choices:', error);
+  }
 }
 
 async function startBuildingStage(gameId) {
-  // Implementation for starting building stage...
-  console.log('Starting building stage for game:', gameId);
+  try {
+    console.log('Starting building stage for game:', gameId);
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError || !game || game.stage !== 'conjoint') return;
+    
+    // Reset player boards and start building
+    const players = game.players.map(player => ({
+      ...player,
+      board: []
+    }));
+    
+    const { error } = await supabase
+      .from('product_games')
+      .update({
+        stage: 'building',
+        players,
+        round_timer: 60
+      })
+      .eq('id', gameId);
+    
+    if (error) throw error;
+    
+    console.log('Building stage started');
+    
+  } catch (error) {
+    console.error('Error starting building stage:', error);
+  }
 }
