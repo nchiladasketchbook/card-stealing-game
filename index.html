@@ -987,7 +987,7 @@
                     updateConnectionStatus('disconnected');
                     setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, 1000); // Update every second for better responsiveness
+            }, gameState === 'building' ? 2000 : 1000); // Slower updates during building to reduce conflicts
         }
 
         function updateLobbyView() {
@@ -1135,7 +1135,8 @@
                     const slot = document.createElement('div');
                     slot.className = 'board-slot';
                     slot.ondrop = (e) => handleDrop(e, i);
-                    slot.ondragover = (e) => e.preventDefault();
+                    slot.ondragover = handleDragOver;
+                    slot.ondragenter = (e) => e.preventDefault();
                     
                     if (board[i]) {
                         slot.classList.add('filled');
@@ -1280,12 +1281,15 @@
         }
 
         async function addFeatureToBoard(feature, slotIndex = null) {
-            if (!gameId || !playerId || gameState !== 'building') return;
+            if (!gameId || !playerId || gameState !== 'building') {
+                console.log('Cannot add feature - invalid state:', { gameId, playerId, gameState });
+                return;
+            }
             
             console.log('Adding feature to board:', feature, 'slot:', slotIndex);
             
             try {
-                await apiCall('/game/build', {
+                const response = await apiCall('/game/build', {
                     method: 'POST',
                     body: JSON.stringify({
                         gameId,
@@ -1296,7 +1300,28 @@
                     })
                 });
                 
-                console.log('Feature added successfully');
+                console.log('Feature add response:', response);
+                
+                // Immediately update local state for responsiveness
+                if (currentPlayer && currentPlayer.board.length < 4) {
+                    if (slotIndex !== null && slotIndex < 4) {
+                        currentPlayer.board[slotIndex] = feature;
+                    } else {
+                        currentPlayer.board.push(feature);
+                    }
+                    
+                    // Remove from available features locally
+                    if (gameData && gameData.available_features) {
+                        const featureIndex = gameData.available_features.indexOf(feature);
+                        if (featureIndex !== -1) {
+                            gameData.available_features.splice(featureIndex, 1);
+                        }
+                    }
+                    
+                    // Update UI immediately
+                    updateBuildingView();
+                }
+                
             } catch (error) {
                 console.error('Failed to add feature:', error);
                 showNotification('Failed to add feature. Please try again.', 'error');
@@ -1304,12 +1329,15 @@
         }
 
         async function stealFeature(sourcePlayerId, feature, targetSlot) {
-            if (!gameId || !playerId || gameState !== 'building') return;
+            if (!gameId || !playerId || gameState !== 'building') {
+                console.log('Cannot steal feature - invalid state');
+                return;
+            }
             
             console.log('Stealing feature:', feature, 'from:', sourcePlayerId, 'to slot:', targetSlot);
             
             try {
-                await apiCall('/game/build', {
+                const response = await apiCall('/game/build', {
                     method: 'POST',
                     body: JSON.stringify({
                         gameId,
@@ -1321,7 +1349,28 @@
                     })
                 });
                 
-                console.log('Feature stolen successfully');
+                console.log('Feature steal response:', response);
+                
+                // Immediately update local state for responsiveness
+                if (currentPlayer && gameData && gameData.players) {
+                    const sourcePlayer = gameData.players.find(p => p.id === sourcePlayerId);
+                    if (sourcePlayer) {
+                        const featureIndex = sourcePlayer.board.indexOf(feature);
+                        if (featureIndex !== -1) {
+                            sourcePlayer.board.splice(featureIndex, 1);
+                            
+                            if (targetSlot !== null && targetSlot < 4) {
+                                currentPlayer.board[targetSlot] = feature;
+                            } else {
+                                currentPlayer.board.push(feature);
+                            }
+                            
+                            // Update UI immediately
+                            updateBuildingView();
+                        }
+                    }
+                }
+                
             } catch (error) {
                 console.error('Failed to steal feature:', error);
                 showNotification('Failed to steal feature. Please try again.', 'error');
@@ -1358,10 +1407,31 @@
 
         function handleDrop(event, slotIndex) {
             event.preventDefault();
+            event.stopPropagation();
+            
             const feature = event.dataTransfer.getData('text/plain');
             const sourcePlayerId = event.dataTransfer.getData('source-player');
             
             console.log('Drop:', feature, 'to slot:', slotIndex, 'from player:', sourcePlayerId);
+            
+            if (!feature) {
+                console.error('No feature data in drop event');
+                return;
+            }
+            
+            // Check if slot is already filled
+            if (currentPlayer && currentPlayer.board && currentPlayer.board[slotIndex]) {
+                console.log('Slot already filled, cannot drop');
+                showNotification('Slot is already filled!', 'error');
+                return;
+            }
+            
+            // Check if player board is full
+            if (currentPlayer && currentPlayer.board && currentPlayer.board.length >= 4) {
+                console.log('Board is full, cannot drop');
+                showNotification('Your board is full!', 'error');
+                return;
+            }
             
             if (sourcePlayerId) {
                 stealFeature(sourcePlayerId, feature, slotIndex);
@@ -1371,6 +1441,11 @@
             
             // Remove highlighting
             event.target.classList.remove('can-drop', 'steal-target');
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = 'move';
         }
 
         function showNotification(message, type = 'success') {
