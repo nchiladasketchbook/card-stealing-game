@@ -862,6 +862,13 @@
                 if (!gameId) return;
                 
                 try {
+                    // First, progress the game (handles timers and stage transitions)
+                    await apiCall('/game/progress', {
+                        method: 'POST',
+                        body: JSON.stringify({ gameId })
+                    });
+                    
+                    // Then get the updated status
                     const status = await apiCall(`/game/status?gameId=${gameId}`);
                     const previousStage = gameData?.stage;
                     
