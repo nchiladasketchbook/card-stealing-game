@@ -477,7 +477,11 @@
         }
 
         .hidden {
-            display: none;
+            display: none !important;
+        }
+
+        .visible {
+            display: block !important;
         }
 
         .error-message {
@@ -753,37 +757,59 @@
         }
 
         function showView(viewName) {
-            console.log('Showing view:', viewName);
+            console.log('🎯 showView called with:', viewName);
             
             // Validate that the view exists
             const targetView = document.getElementById(viewName);
             if (!targetView) {
-                console.error('View not found:', viewName);
+                console.error('❌ View not found:', viewName);
                 return;
             }
             
-            // Hide all views first
+            console.log('📋 Current view states before change:');
             const views = ['entryView', 'lobbyView', 'conjointView', 'buildingView', 'resultsView'];
             views.forEach(view => {
                 const el = document.getElementById(view);
                 if (el) {
+                    const isHidden = el.classList.contains('hidden');
+                    console.log(`  ${view}: ${isHidden ? 'HIDDEN' : 'VISIBLE'}`);
+                }
+            });
+            
+            // Hide all views first
+            views.forEach(view => {
+                const el = document.getElementById(view);
+                if (el) {
                     el.classList.add('hidden');
-                    console.log('Hiding view:', view);
-                } else {
-                    console.warn('View element not found:', view);
+                    el.style.display = 'none'; // Force hide with inline style too
                 }
             });
 
             // Show the requested view
             targetView.classList.remove('hidden');
-            console.log('Successfully showing view:', viewName);
+            targetView.style.display = 'block'; // Force show with inline style
+            console.log('✅ Successfully set', viewName, 'to visible');
             
-            // Verify the view is visible
+            // Verify the view is visible after a brief delay
             setTimeout(() => {
-                const isVisible = !targetView.classList.contains('hidden');
-                console.log('View visibility check:', viewName, 'visible:', isVisible);
-                if (!isVisible) {
-                    console.error('View failed to show properly:', viewName);
+                const isHidden = targetView.classList.contains('hidden');
+                const displayStyle = window.getComputedStyle(targetView).display;
+                console.log('🔍 View visibility check:', viewName);
+                console.log('  - has hidden class:', isHidden);
+                console.log('  - computed display style:', displayStyle);
+                console.log('  - element dimensions:', {
+                    width: targetView.offsetWidth,
+                    height: targetView.offsetHeight
+                });
+                
+                if (isHidden || displayStyle === 'none') {
+                    console.error('❌ View failed to show properly:', viewName);
+                    // Force show again
+                    targetView.classList.remove('hidden');
+                    targetView.style.display = 'block';
+                    targetView.style.visibility = 'visible';
+                } else {
+                    console.log('✅ View is properly visible:', viewName);
                 }
             }, 100);
         }
@@ -902,29 +928,44 @@
                     
                     // Handle stage transitions
                     if (status.stage !== gameState) {
-                        console.log('Stage changed from', gameState, 'to', status.stage);
+                        console.log('🔄 Stage changed from', gameState, 'to', status.stage);
+                        const previousGameState = gameState;
                         gameState = status.stage;
                         
-                        switch (status.stage) {
-                            case 'lobby':
-                                showView('lobbyView');
-                                break;
-                            case 'conjoint':
-                                console.log('Transitioning to conjoint view with product options:', status.product_options?.length);
-                                showView('conjointView');
-                                selectedOption = null; // Reset selection
-                                break;
-                            case 'building':
-                                console.log('Transitioning to building view');
-                                showView('buildingView');
-                                break;
-                            case 'completed':
-                                console.log('Game completed, showing results');
-                                showView('resultsView');
-                                clearInterval(updateInterval);
-                                updateResultsView();
-                                return;
-                        }
+                        // Add a small delay to ensure DOM is ready
+                        setTimeout(() => {
+                            switch (status.stage) {
+                                case 'lobby':
+                                    console.log('🚪 Switching to lobby view');
+                                    showView('lobbyView');
+                                    break;
+                                case 'conjoint':
+                                    console.log('🎯 Switching to conjoint view with product options:', status.product_options?.length);
+                                    showView('conjointView');
+                                    selectedOption = null; // Reset selection
+                                    // Emergency check - if conjoint view is not showing, force it
+                                    setTimeout(() => {
+                                        const conjointView = document.getElementById('conjointView');
+                                        if (conjointView && conjointView.classList.contains('hidden')) {
+                                            console.error('🚨 EMERGENCY: Conjoint view still hidden, forcing show');
+                                            conjointView.classList.remove('hidden');
+                                            conjointView.style.display = 'block';
+                                            conjointView.style.visibility = 'visible';
+                                        }
+                                    }, 200);
+                                    break;
+                                case 'building':
+                                    console.log('🏗️ Switching to building view');
+                                    showView('buildingView');
+                                    break;
+                                case 'completed':
+                                    console.log('🏆 Game completed, showing results');
+                                    showView('resultsView');
+                                    clearInterval(updateInterval);
+                                    updateResultsView();
+                                    return;
+                            }
+                        }, 50); // Small delay to ensure DOM updates
                     }
                     
                     // Update current view based on stage
@@ -1427,16 +1468,61 @@
             updateConnectionStatus('disconnected');
         });
 
-        // Test function for debugging
-        window.testGame = function() {
-            console.log('Game state:', {
-                gameState,
-                gameId,
-                playerId,
-                playerName,
-                gameData,
-                currentPlayer
+        // Global debugging functions
+        window.debugGameState = function() {
+            console.log('🐛 GAME DEBUG INFO:');
+            console.log('Current gameState:', gameState);
+            console.log('Game data:', gameData);
+            console.log('Current player:', currentPlayer);
+            console.log('Game ID:', gameId);
+            console.log('Player ID:', playerId);
+            
+            console.log('\n🔍 VIEW STATES:');
+            const views = ['entryView', 'lobbyView', 'conjointView', 'buildingView', 'resultsView'];
+            views.forEach(view => {
+                const el = document.getElementById(view);
+                if (el) {
+                    const isHidden = el.classList.contains('hidden');
+                    const displayStyle = window.getComputedStyle(el).display;
+                    console.log(`${view}:`, {
+                        hidden: isHidden,
+                        display: displayStyle,
+                        dimensions: { width: el.offsetWidth, height: el.offsetHeight }
+                    });
+                } else {
+                    console.log(`${view}: NOT FOUND`);
+                }
             });
+        };
+
+        window.forceShowConjoint = function() {
+            console.log('🚨 FORCE SHOWING CONJOINT VIEW');
+            const conjointView = document.getElementById('conjointView');
+            if (conjointView) {
+                conjointView.classList.remove('hidden');
+                conjointView.style.display = 'block';
+                conjointView.style.visibility = 'visible';
+                conjointView.style.opacity = '1';
+                console.log('✅ Conjoint view forced to show');
+                updateConjointView();
+            } else {
+                console.error('❌ Conjoint view element not found!');
+            }
+        };
+
+        window.forceShowResults = function() {
+            console.log('🚨 FORCE SHOWING RESULTS VIEW');
+            const resultsView = document.getElementById('resultsView');
+            if (resultsView) {
+                resultsView.classList.remove('hidden');
+                resultsView.style.display = 'block';
+                resultsView.style.visibility = 'visible';
+                resultsView.style.opacity = '1';
+                console.log('✅ Results view forced to show');
+                updateResultsView();
+            } else {
+                console.error('❌ Results view element not found!');
+            }
         };
     </script>
 </body>
