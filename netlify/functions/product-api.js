@@ -531,6 +531,57 @@ async function progressGame(body) {
         shouldUpdate = true;
       }
       
+      // Make bots build features every few seconds
+      if (timeSinceBuilding > 2 && timeSinceBuilding % 3 === 0) {
+        const players = [...game.players];
+        const availableFeatures = [...game.available_features];
+        const featureStats = { ...game.feature_stats };
+        let botsActed = false;
+        
+        players.forEach(player => {
+          if (player.is_bot && player.board.length < 4) {
+            // 70% chance bot takes action this cycle
+            if (Math.random() < 0.7) {
+              // 80% chance to take from pool, 20% chance to steal
+              if (Math.random() < 0.8 && availableFeatures.length > 0) {
+                // Take from pool
+                const featureIndex = Math.floor(Math.random() * availableFeatures.length);
+                const feature = availableFeatures.splice(featureIndex, 1)[0];
+                player.board.push(feature);
+                
+                if (featureStats[feature]) {
+                  featureStats[feature].build_selections++;
+                }
+                botsActed = true;
+                console.log(`Bot ${player.name} took ${feature} from pool`);
+              } else {
+                // Try to steal
+                const playersWithFeatures = players.filter(p => p.id !== player.id && p.board.length > 0);
+                if (playersWithFeatures.length > 0) {
+                  const targetPlayer = playersWithFeatures[Math.floor(Math.random() * playersWithFeatures.length)];
+                  const featureIndex = Math.floor(Math.random() * targetPlayer.board.length);
+                  const stolenFeature = targetPlayer.board.splice(featureIndex, 1)[0];
+                  player.board.push(stolenFeature);
+                  
+                  if (featureStats[stolenFeature]) {
+                    featureStats[stolenFeature].build_selections++;
+                  }
+                  botsActed = true;
+                  console.log(`Bot ${player.name} stole ${stolenFeature} from ${targetPlayer.name}`);
+                }
+              }
+            }
+          }
+        });
+        
+        if (botsActed) {
+          updatedFields.players = players;
+          updatedFields.available_features = availableFeatures;
+          updatedFields.feature_stats = featureStats;
+          shouldUpdate = true;
+        }
+      }
+      
       // If timer reached 0, end game
       if (newRoundTimer <= 0) {
         console.log('Building timer expired, ending game');
