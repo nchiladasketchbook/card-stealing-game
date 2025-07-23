@@ -896,6 +896,7 @@
                         stage: status.stage, 
                         previousStage,
                         players: status.players?.length,
+                        botCount: status.players?.filter(p => p.is_bot).length,
                         timer: status.lobby_timer || status.round_timer
                     });
                     
@@ -909,13 +910,16 @@
                                 showView('lobbyView');
                                 break;
                             case 'conjoint':
+                                console.log('Transitioning to conjoint view with product options:', status.product_options?.length);
                                 showView('conjointView');
                                 selectedOption = null; // Reset selection
                                 break;
                             case 'building':
+                                console.log('Transitioning to building view');
                                 showView('buildingView');
                                 break;
                             case 'completed':
+                                console.log('Game completed, showing results');
                                 showView('resultsView');
                                 clearInterval(updateInterval);
                                 updateResultsView();
@@ -938,9 +942,11 @@
                     
                 } catch (error) {
                     console.error('Failed to update game status:', error);
-                    // Don't clear interval on temporary errors
+                    // Don't clear interval on temporary errors, but show status
+                    updateConnectionStatus('disconnected');
+                    setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, gameState === 'lobby' ? 1000 : 2000);
+            }, 1000); // Update every second for better responsiveness
         }
 
         function updateLobbyView() {

@@ -440,29 +440,12 @@ async function progressGame(body) {
           usedNames.push(bot.name);
         }
         
-        // Make bots choose conjoint options randomly and update feature stats
-        const featureStats = { ...game.feature_stats };
-        players.forEach(player => {
-          if (player.is_bot) {
-            const choice = Math.floor(Math.random() * 3);
-            player.conjoint_choice = choice;
-            
-            // Update feature stats for bot choices
-            const chosenProduct = game.product_options[choice];
-            if (chosenProduct && chosenProduct.features) {
-              chosenProduct.features.forEach(feature => {
-                if (featureStats[feature]) {
-                  featureStats[feature].conjoint_selections++;
-                }
-              });
-            }
-          }
-        });
+        console.log('Added bots to game:', players.map(p => ({ name: p.name, isBot: p.is_bot })));
         
+        // Don't make bots choose immediately - let them choose in conjoint stage
         updatedFields = {
           stage: 'conjoint',
           players: players,
-          feature_stats: featureStats,
           round_timer: 30,
           lobby_timer: 0,
           conjoint_start_time: new Date().toISOString()
@@ -481,14 +464,52 @@ async function progressGame(body) {
         shouldUpdate = true;
       }
       
+      // Make bots choose after 5 seconds in conjoint stage
+      if (timeSinceConjoint >= 5) {
+        const players = [...game.players];
+        const featureStats = { ...game.feature_stats };
+        let botsMadeChoices = false;
+        
+        players.forEach(player => {
+          if (player.is_bot && player.conjoint_choice === null) {
+            const choice = Math.floor(Math.random() * 3);
+            player.conjoint_choice = choice;
+            botsMadeChoices = true;
+            
+            // Update feature stats for bot choices
+            const chosenProduct = game.product_options[choice];
+            if (chosenProduct && chosenProduct.features) {
+              chosenProduct.features.forEach(feature => {
+                if (featureStats[feature]) {
+                  featureStats[feature].conjoint_selections++;
+                }
+              });
+            }
+          }
+        });
+        
+        if (botsMadeChoices) {
+          console.log('Bots made conjoint choices');
+          updatedFields.players = players;
+          updatedFields.feature_stats = featureStats;
+          shouldUpdate = true;
+        }
+      }
+      
       // If timer reached 0, advance to building stage
       if (newRoundTimer <= 0) {
         console.log('Conjoint timer expired, advancing to building stage');
         
-        const players = game.players.map(player => ({
-          ...player,
-          board: []
-        }));
+        // Ensure all bots have made choices before advancing
+        const players = game.players.map(player => {
+          if (player.is_bot && player.conjoint_choice === null) {
+            player.conjoint_choice = Math.floor(Math.random() * 3);
+          }
+          return {
+            ...player,
+            board: []
+          };
+        });
         
         updatedFields = {
           stage: 'building',
