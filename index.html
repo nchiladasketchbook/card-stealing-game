@@ -484,6 +484,78 @@
             display: block !important;
         }
 
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 10000;
+            transition: all 0.1s ease-out;
+        }
+
+        .cursor.player {
+            background: #667eea;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .cursor.bot {
+            background: #ff6b6b;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .cursor-label {
+            position: absolute;
+            top: -30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+
+        .cursor-action {
+            position: absolute;
+            top: -50px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            animation: cursorAction 2s ease-out forwards;
+        }
+
+        @keyframes cursorAction {
+            0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
+        }
+
+        .drag-trail {
+            position: fixed;
+            width: 2px;
+            height: 2px;
+            background: #667eea;
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: trailFade 0.5s ease-out forwards;
+        }
+
+        @keyframes trailFade {
+            0% { opacity: 0.8; transform: scale(1); }
+            100% { opacity: 0; transform: scale(0.3); }
+        }
+
         .error-message {
             background: #f8d7da;
             color: #721c24;
@@ -657,10 +729,158 @@
             returnBtn: () => document.getElementById('returnBtn')
         };
 
+        // Cursor tracking variables
+        let cursors = new Map(); // Store cursor elements
+        let lastCursorUpdate = 0;
+        let isDragging = false;
+
+        // Initialize cursor tracking
+        function initializeCursorTracking() {
+            // Track mouse movement
+            document.addEventListener('mousemove', (e) => {
+                if (gameState === 'building' && gameId && playerId) {
+                    const now = Date.now();
+                    
+                    // Only send updates every 100ms to avoid spam
+                    if (now - lastCursorUpdate > 100) {
+                        lastCursorUpdate = now;
+                        
+                        // Send cursor position to server (don't await to avoid blocking)
+                        apiCall('/game/cursor', {
+                            method: 'POST',
+                            body: JSON.stringify({
+                                gameId,
+                                playerId,
+                                x: e.clientX,
+                                y: e.clientY
+                            })
+                        }).catch(err => console.warn('Cursor update failed:', err));
+                    }
+                    
+                    // Create drag trail effect when dragging
+                    if (isDragging) {
+                        createDragTrail(e.clientX, e.clientY);
+                    }
+                }
+            });
+        }
+
+        function createDragTrail(x, y) {
+            const trail = document.createElement('div');
+            trail.className = 'drag-trail';
+            trail.style.left = x + 'px';
+            trail.style.top = y + 'px';
+            document.body.appendChild(trail);
+            
+            // Remove trail after animation
+            setTimeout(() => {
+                if (trail.parentNode) {
+                    document.body.removeChild(trail);
+                }
+            }, 500);
+        }
+
+        function updateCursors() {
+            if (!gameData || !gameData.players || gameState !== 'building') {
+                return;
+            }
+            
+            const now = Date.now();
+            
+            gameData.players.forEach(player => {
+                if (player.id === playerId) return; // Don't show own cursor
+                
+                const cursor = player.cursor;
+                if (!cursor || !cursor.x || !cursor.y) return;
+                
+                // Check if cursor data is recent (within 10 seconds)
+                const lastUpdate = new Date(cursor.lastUpdate).getTime();
+                if (now - lastUpdate > 10000) return;
+                
+                let cursorElement = cursors.get(player.id);
+                
+                if (!cursorElement) {
+                    // Create new cursor element
+                    cursorElement = document.createElement('div');
+                    cursorElement.className = `cursor ${player.is_bot ? 'bot' : 'player'}`;
+                    
+                    const label = document.createElement('div');
+                    label.className = 'cursor-label';
+                    label.textContent = player.name + (player.is_bot ? ' 🤖' : '');
+                    cursorElement.appendChild(label);
+                    
+                    document.body.appendChild(cursorElement);
+                    cursors.set(player.id, cursorElement);
+                }
+                
+                // Update cursor position
+                cursorElement.style.left = cursor.x + 'px';
+                cursorElement.style.top = cursor.y + 'px';
+                
+                // Show action if bot just performed one
+                if (cursor.action && player.is_bot) {
+                    const actionTime = new Date(cursor.action.timestamp).getTime();
+                    if (now - actionTime < 3000) { // Show action for 3 seconds
+                        showCursorAction(cursorElement, cursor.action);
+                    }
+                }
+            });
+            
+            // Clean up old cursors for players no longer in game
+            const currentPlayerIds = new Set(gameData.players.map(p => p.id));
+            for (const [playerId, cursorElement] of cursors) {
+                if (!currentPlayerIds.has(playerId)) {
+                    if (cursorElement.parentNode) {
+                        document.body.removeChild(cursorElement);
+                    }
+                    cursors.delete(playerId);
+                }
+            }
+        }
+
+        function showCursorAction(cursorElement, action) {
+            // Remove existing action if any
+            const existingAction = cursorElement.querySelector('.cursor-action');
+            if (existingAction) {
+                existingAction.remove();
+            }
+            
+            const actionElement = document.createElement('div');
+            actionElement.className = 'cursor-action';
+            
+            if (action.type === 'take') {
+                actionElement.textContent = `📦 ${action.feature}`;
+                actionElement.style.background = '#4CAF50';
+            } else if (action.type === 'steal') {
+                actionElement.textContent = `💰 Stole ${action.feature}`;
+                actionElement.style.background = '#ff9800';
+            }
+            
+            cursorElement.appendChild(actionElement);
+            
+            // Remove action element after animation
+            setTimeout(() => {
+                if (actionElement.parentNode) {
+                    actionElement.remove();
+                }
+            }, 2000);
+        }
+
+        function cleanupCursors() {
+            // Remove all cursor elements when leaving building stage
+            for (const [playerId, cursorElement] of cursors) {
+                if (cursorElement.parentNode) {
+                    document.body.removeChild(cursorElement);
+                }
+            }
+            cursors.clear();
+        }
+
         // Initialize game when page loads
         document.addEventListener('DOMContentLoaded', function() {
             console.log('DOM loaded, initializing game...');
             initializeGame();
+            initializeCursorTracking();
         });
 
         function initializeGame() {
@@ -978,6 +1198,7 @@
                             break;
                         case 'building':
                             updateBuildingView();
+                            updateCursors(); // Update player cursors
                             break;
                     }
                     
@@ -1380,6 +1601,8 @@
         function handleDragStart(event, feature, sourcePlayerId = null) {
             console.log('Drag start:', feature, 'from player:', sourcePlayerId);
             
+            isDragging = true;
+            
             event.dataTransfer.setData('text/plain', feature);
             if (sourcePlayerId) {
                 event.dataTransfer.setData('source-player', sourcePlayerId);
@@ -1396,6 +1619,7 @@
         }
 
         function handleDragEnd(event) {
+            isDragging = false;
             event.target.classList.remove('dragging');
             
             // Remove highlighting from all board slots

@@ -540,6 +540,14 @@ async function progressGame(body) {
         
         players.forEach(player => {
           if (player.is_bot && player.board.length < 4) {
+            // Update bot cursor position to simulate movement
+            player.cursor = {
+              x: Math.floor(Math.random() * 1000) + 100,
+              y: Math.floor(Math.random() * 600) + 200,
+              lastUpdate: new Date().toISOString(),
+              action: null
+            };
+            
             // 70% chance bot takes action this cycle
             if (Math.random() < 0.7) {
               // 80% chance to take from pool, 20% chance to steal
@@ -548,6 +556,13 @@ async function progressGame(body) {
                 const featureIndex = Math.floor(Math.random() * availableFeatures.length);
                 const feature = availableFeatures.splice(featureIndex, 1)[0];
                 player.board.push(feature);
+                
+                // Set cursor action for visual feedback
+                player.cursor.action = {
+                  type: 'take',
+                  feature: feature,
+                  timestamp: new Date().toISOString()
+                };
                 
                 if (featureStats[feature]) {
                   featureStats[feature].build_selections++;
@@ -562,6 +577,14 @@ async function progressGame(body) {
                   const featureIndex = Math.floor(Math.random() * targetPlayer.board.length);
                   const stolenFeature = targetPlayer.board.splice(featureIndex, 1)[0];
                   player.board.push(stolenFeature);
+                  
+                  // Set cursor action for visual feedback
+                  player.cursor.action = {
+                    type: 'steal',
+                    feature: stolenFeature,
+                    target: targetPlayer.name,
+                    timestamp: new Date().toISOString()
+                  };
                   
                   if (featureStats[stolenFeature]) {
                     featureStats[stolenFeature].build_selections++;
@@ -704,7 +727,58 @@ async function submitConjointChoice(body) {
   }
 }
 
-async function handleBuildAction(body) {
+async function updateCursor(body) {
+  try {
+    const { gameId, playerId, x, y } = body;
+    
+    if (!gameId || !playerId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing gameId or playerId' })
+      };
+    }
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError) throw gameError;
+    
+    // Update player cursor position
+    const players = game.players.map(player => {
+      if (player.id === playerId) {
+        player.cursor = { x, y, lastUpdate: new Date().toISOString() };
+      }
+      return player;
+    });
+    
+    const { error } = await supabase
+      .from('product_games')
+      .update({ players })
+      .eq('id', gameId);
+    
+    if (error) throw error;
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: true })
+    };
+  } catch (error) {
+    console.error('Error in updateCursor:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to update cursor',
+        message: error.message
+      })
+    };
+  }
+}
   try {
     const { gameId, playerId, action, feature, sourcePlayerId, slotIndex } = body;
     
