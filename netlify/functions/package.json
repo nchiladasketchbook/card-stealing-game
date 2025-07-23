@@ -2,7 +2,17 @@
   "name": "product-builder-functions",
   "version": "1.0.0",
   "description": "Netlify Functions for Product Builder Game",
+  "main": "product-api.js",
   "dependencies": {
     "@supabase/supabase-js": "^2.51.0"
-  }
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "scripts": {
+    "test": "echo \"No tests yet\""
+  },
+  "keywords": ["netlify", "serverless", "supabase", "game"],
+  "author": "Your Name",
+  "license": "MIT"
 }
