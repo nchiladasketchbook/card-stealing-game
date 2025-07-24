@@ -155,6 +155,9 @@ exports.handler = async (event, context) => {
       case '/game/build':
         return await handleBuildAction(body);
       
+      case '/game/cursor':
+        return await updateCursor(body);
+      
       default:
         console.log('Route not found:', path);
         return { 
@@ -442,7 +445,6 @@ async function progressGame(body) {
         
         console.log('Added bots to game:', players.map(p => ({ name: p.name, isBot: p.is_bot })));
         
-        // Don't make bots choose immediately - let them choose in conjoint stage
         updatedFields = {
           stage: 'conjoint',
           players: players,
@@ -531,7 +533,7 @@ async function progressGame(body) {
         shouldUpdate = true;
       }
       
-      // Make bots build features every few seconds
+      // Make bots build features and move cursors every few seconds
       if (timeSinceBuilding > 2 && timeSinceBuilding % 3 === 0) {
         const players = [...game.players];
         const availableFeatures = [...game.available_features];
@@ -539,58 +541,60 @@ async function progressGame(body) {
         let botsActed = false;
         
         players.forEach(player => {
-          if (player.is_bot && player.board.length < 4) {
+          if (player.is_bot) {
             // Update bot cursor position to simulate movement
             player.cursor = {
-              x: Math.floor(Math.random() * 1000) + 100,
-              y: Math.floor(Math.random() * 600) + 200,
+              x: Math.floor(Math.random() * 800) + 200,
+              y: Math.floor(Math.random() * 400) + 300,
               lastUpdate: new Date().toISOString(),
               action: null
             };
             
-            // 70% chance bot takes action this cycle
-            if (Math.random() < 0.7) {
-              // 80% chance to take from pool, 20% chance to steal
-              if (Math.random() < 0.8 && availableFeatures.length > 0) {
-                // Take from pool
-                const featureIndex = Math.floor(Math.random() * availableFeatures.length);
-                const feature = availableFeatures.splice(featureIndex, 1)[0];
-                player.board.push(feature);
-                
-                // Set cursor action for visual feedback
-                player.cursor.action = {
-                  type: 'take',
-                  feature: feature,
-                  timestamp: new Date().toISOString()
-                };
-                
-                if (featureStats[feature]) {
-                  featureStats[feature].build_selections++;
-                }
-                botsActed = true;
-                console.log(`Bot ${player.name} took ${feature} from pool`);
-              } else {
-                // Try to steal
-                const playersWithFeatures = players.filter(p => p.id !== player.id && p.board.length > 0);
-                if (playersWithFeatures.length > 0) {
-                  const targetPlayer = playersWithFeatures[Math.floor(Math.random() * playersWithFeatures.length)];
-                  const featureIndex = Math.floor(Math.random() * targetPlayer.board.length);
-                  const stolenFeature = targetPlayer.board.splice(featureIndex, 1)[0];
-                  player.board.push(stolenFeature);
+            if (player.board.length < 4) {
+              // 70% chance bot takes action this cycle
+              if (Math.random() < 0.7) {
+                // 80% chance to take from pool, 20% chance to steal
+                if (Math.random() < 0.8 && availableFeatures.length > 0) {
+                  // Take from pool
+                  const featureIndex = Math.floor(Math.random() * availableFeatures.length);
+                  const feature = availableFeatures.splice(featureIndex, 1)[0];
+                  player.board.push(feature);
                   
                   // Set cursor action for visual feedback
                   player.cursor.action = {
-                    type: 'steal',
-                    feature: stolenFeature,
-                    target: targetPlayer.name,
+                    type: 'take',
+                    feature: feature,
                     timestamp: new Date().toISOString()
                   };
                   
-                  if (featureStats[stolenFeature]) {
-                    featureStats[stolenFeature].build_selections++;
+                  if (featureStats[feature]) {
+                    featureStats[feature].build_selections++;
                   }
                   botsActed = true;
-                  console.log(`Bot ${player.name} stole ${stolenFeature} from ${targetPlayer.name}`);
+                  console.log(`Bot ${player.name} took ${feature} from pool`);
+                } else {
+                  // Try to steal
+                  const playersWithFeatures = players.filter(p => p.id !== player.id && p.board.length > 0);
+                  if (playersWithFeatures.length > 0) {
+                    const targetPlayer = playersWithFeatures[Math.floor(Math.random() * playersWithFeatures.length)];
+                    const featureIndex = Math.floor(Math.random() * targetPlayer.board.length);
+                    const stolenFeature = targetPlayer.board.splice(featureIndex, 1)[0];
+                    player.board.push(stolenFeature);
+                    
+                    // Set cursor action for visual feedback
+                    player.cursor.action = {
+                      type: 'steal',
+                      feature: stolenFeature,
+                      target: targetPlayer.name,
+                      timestamp: new Date().toISOString()
+                    };
+                    
+                    if (featureStats[stolenFeature]) {
+                      featureStats[stolenFeature].build_selections++;
+                    }
+                    botsActed = true;
+                    console.log(`Bot ${player.name} stole ${stolenFeature} from ${targetPlayer.name}`);
+                  }
                 }
               }
             }
@@ -727,58 +731,7 @@ async function submitConjointChoice(body) {
   }
 }
 
-async function updateCursor(body) {
-  try {
-    const { gameId, playerId, x, y } = body;
-    
-    if (!gameId || !playerId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({ error: 'Missing gameId or playerId' })
-      };
-    }
-    
-    const { data: game, error: gameError } = await supabase
-      .from('product_games')
-      .select('*')
-      .eq('id', gameId)
-      .single();
-    
-    if (gameError) throw gameError;
-    
-    // Update player cursor position
-    const players = game.players.map(player => {
-      if (player.id === playerId) {
-        player.cursor = { x, y, lastUpdate: new Date().toISOString() };
-      }
-      return player;
-    });
-    
-    const { error } = await supabase
-      .from('product_games')
-      .update({ players })
-      .eq('id', gameId);
-    
-    if (error) throw error;
-    
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ success: true })
-    };
-  } catch (error) {
-    console.error('Error in updateCursor:', error);
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ 
-        error: 'Failed to update cursor',
-        message: error.message
-      })
-    };
-  }
-}
+async function handleBuildAction(body) {
   try {
     const { gameId, playerId, action, feature, sourcePlayerId, slotIndex } = body;
     
@@ -871,6 +824,59 @@ async function updateCursor(body) {
       headers,
       body: JSON.stringify({ 
         error: 'Failed to handle build action',
+        message: error.message
+      })
+    };
+  }
+}
+
+async function updateCursor(body) {
+  try {
+    const { gameId, playerId, x, y } = body;
+    
+    if (!gameId || !playerId) {
+      return {
+        statusCode: 400,
+        headers,
+        body: JSON.stringify({ error: 'Missing gameId or playerId' })
+      };
+    }
+    
+    const { data: game, error: gameError } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('id', gameId)
+      .single();
+    
+    if (gameError) throw gameError;
+    
+    // Update player cursor position
+    const players = game.players.map(player => {
+      if (player.id === playerId) {
+        player.cursor = { x, y, lastUpdate: new Date().toISOString() };
+      }
+      return player;
+    });
+    
+    const { error } = await supabase
+      .from('product_games')
+      .update({ players })
+      .eq('id', gameId);
+    
+    if (error) throw error;
+    
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify({ success: true })
+    };
+  } catch (error) {
+    console.error('Error in updateCursor:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ 
+        error: 'Failed to update cursor',
         message: error.message
       })
     };
