@@ -448,7 +448,7 @@ async function progressGame(body) {
         updatedFields = {
           stage: 'conjoint',
           players: players,
-          round_timer: 30,
+          round_timer: 10,
           lobby_timer: 0,
           conjoint_start_time: new Date().toISOString()
         };
@@ -459,7 +459,7 @@ async function progressGame(body) {
         new Date(game.conjoint_start_time).getTime() : 
         gameStartTime;
       const timeSinceConjoint = Math.floor((currentTime - conjointStartTime) / 1000);
-      const newRoundTimer = Math.max(0, 30 - timeSinceConjoint);
+      const newRoundTimer = Math.max(0, 10 - timeSinceConjoint);
       
       if (newRoundTimer !== game.round_timer) {
         updatedFields.round_timer = newRoundTimer;
@@ -533,8 +533,8 @@ async function progressGame(body) {
         shouldUpdate = true;
       }
       
-      // Make bots build features and move cursors every few seconds
-      if (timeSinceBuilding > 2 && timeSinceBuilding % 3 === 0) {
+      // Make bots build features and move cursors every few seconds, but only after 5 seconds
+      if (timeSinceBuilding >= 5 && timeSinceBuilding % 3 === 0) {
         const players = [...game.players];
         const availableFeatures = [...game.available_features];
         const featureStats = { ...game.feature_stats };

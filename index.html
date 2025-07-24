@@ -238,6 +238,18 @@
             margin: 20px 0;
         }
 
+        .left-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .right-column {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+
         .feature-pool {
             background: #f8f9fa;
             border-radius: 12px;
@@ -313,7 +325,6 @@
         }
 
         .other-players {
-            margin-top: 20px;
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
             gap: 15px;
@@ -680,7 +691,7 @@
                 <div class="stage-header">
                     <h2 class="stage-title">Stage 1: Product Preference</h2>
                     <p class="stage-description">Choose which product you would be most likely to buy</p>
-                    <div id="conjointTimer" class="timer">Time remaining: 30s</div>
+                    <div id="conjointTimer" class="timer">Time remaining: 10s</div>
                 </div>
 
                 <div id="productOptions" class="product-options">
@@ -701,24 +712,26 @@
                 </div>
 
                 <div class="building-area">
-                    <div class="feature-pool">
-                        <h3>Available Features</h3>
-                        <div id="featuresGrid" class="features-grid">
-                            <!-- Available features will be populated here -->
-                        </div>
-                    </div>
-
-                    <div>
-                        <div class="player-board">
-                            <h3>Your Product Board</h3>
-                            <div id="playerBoard" class="board-grid">
-                                <!-- Player board slots will be populated here -->
+                    <div class="left-column">
+                        <div class="feature-pool">
+                            <h3>Available Features</h3>
+                            <div id="featuresGrid" class="features-grid">
+                                <!-- Available features will be populated here -->
                             </div>
                         </div>
                         
                         <div class="other-players">
                             <div id="otherPlayersContainer">
                                 <!-- Other players will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="right-column">
+                        <div class="player-board">
+                            <h3>Your Product Board</h3>
+                            <div id="playerBoard" class="board-grid">
+                                <!-- Player board slots will be populated here -->
                             </div>
                         </div>
                     </div>
@@ -827,6 +840,20 @@
                 return;
             }
             
+            // Only show cursors after 5 seconds into building stage
+            const buildingStartTime = gameData.building_start_time ? new Date(gameData.building_start_time).getTime() : Date.now();
+            const timeSinceBuilding = Math.floor((Date.now() - buildingStartTime) / 1000);
+            
+            if (timeSinceBuilding < 5) {
+                // Hide all cursors during first 5 seconds
+                for (const [playerId, cursorElement] of cursors) {
+                    if (cursorElement.parentNode) {
+                        cursorElement.style.display = 'none';
+                    }
+                }
+                return;
+            }
+            
             const now = Date.now();
             
             gameData.players.forEach(player => {
@@ -853,6 +880,8 @@
                     cursors.set(player.id, cursorElement);
                 }
                 
+                // Show cursor after 5 seconds
+                cursorElement.style.display = 'block';
                 cursorElement.style.left = cursor.x + 'px';
                 cursorElement.style.top = cursor.y + 'px';
                 
@@ -1222,7 +1251,7 @@
             
             const timerEl = document.getElementById('conjointTimer');
             if (timerEl) {
-                timerEl.textContent = `Time remaining: ${gameData.round_timer || 30}s`;
+                timerEl.textContent = `Time remaining: ${gameData.round_timer || 10}s`;
             }
             
             const optionsContainer = document.getElementById('productOptions');
