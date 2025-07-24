@@ -116,20 +116,6 @@
             text-align: center;
         }
 
-        .countdown-container {
-            background: #f8f9fa;
-            border-radius: 12px;
-            padding: 25px;
-            margin: 20px 0;
-        }
-
-        .countdown-text {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #333;
-            margin-bottom: 20px;
-        }
-
         .progress-bar-container {
             width: 100%;
             height: 12px;
@@ -484,78 +470,6 @@
             display: block !important;
         }
 
-        .cursor {
-            position: fixed;
-            width: 20px;
-            height: 20px;
-            pointer-events: none;
-            z-index: 10000;
-            transition: all 0.1s ease-out;
-        }
-
-        .cursor.player {
-            background: #667eea;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .cursor.bot {
-            background: #ff6b6b;
-            border: 2px solid white;
-            border-radius: 50%;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-        }
-
-        .cursor-label {
-            position: absolute;
-            top: -30px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: rgba(0,0,0,0.8);
-            color: white;
-            padding: 4px 8px;
-            border-radius: 4px;
-            font-size: 0.8rem;
-            white-space: nowrap;
-            pointer-events: none;
-        }
-
-        .cursor-action {
-            position: absolute;
-            top: -50px;
-            left: 50%;
-            transform: translateX(-50%);
-            background: #4CAF50;
-            color: white;
-            padding: 2px 6px;
-            border-radius: 3px;
-            font-size: 0.7rem;
-            white-space: nowrap;
-            animation: cursorAction 2s ease-out forwards;
-        }
-
-        @keyframes cursorAction {
-            0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-            100% { opacity: 0; transform: translateX(-50%) translateY(-20px); }
-        }
-
-        .drag-trail {
-            position: fixed;
-            width: 2px;
-            height: 2px;
-            background: #667eea;
-            border-radius: 50%;
-            pointer-events: none;
-            z-index: 9999;
-            animation: trailFade 0.5s ease-out forwards;
-        }
-
-        @keyframes trailFade {
-            0% { opacity: 0.8; transform: scale(1); }
-            100% { opacity: 0; transform: scale(0.3); }
-        }
-
         .error-message {
             background: #f8d7da;
             color: #721c24;
@@ -572,6 +486,129 @@
             color: #666;
         }
 
+        /* Cursor and Animation Styles */
+        .cursor {
+            position: fixed;
+            width: 20px;
+            height: 20px;
+            pointer-events: none;
+            z-index: 10000;
+            transition: all 0.15s ease-out;
+        }
+
+        .cursor.player {
+            background: #667eea;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .cursor.bot {
+            background: #ff6b6b;
+            border: 2px solid white;
+            border-radius: 50%;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+            animation: botPulse 2s ease-in-out infinite;
+        }
+
+        @keyframes botPulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        .cursor-label {
+            position: absolute;
+            top: -35px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.85);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            white-space: nowrap;
+            pointer-events: none;
+            font-weight: 500;
+        }
+
+        .cursor-action {
+            position: absolute;
+            top: -55px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #4CAF50;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            white-space: nowrap;
+            animation: cursorAction 3s ease-out forwards;
+            font-weight: bold;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+
+        .cursor-action.steal {
+            background: #ff9800;
+        }
+
+        @keyframes cursorAction {
+            0% { 
+                opacity: 1; 
+                transform: translateX(-50%) translateY(0) scale(1); 
+            }
+            20% { 
+                transform: translateX(-50%) translateY(-5px) scale(1.05); 
+            }
+            100% { 
+                opacity: 0; 
+                transform: translateX(-50%) translateY(-25px) scale(0.9); 
+            }
+        }
+
+        .drag-trail {
+            position: fixed;
+            width: 4px;
+            height: 4px;
+            background: linear-gradient(45deg, #667eea, #764ba2);
+            border-radius: 50%;
+            pointer-events: none;
+            z-index: 9999;
+            animation: trailFade 0.6s ease-out forwards;
+        }
+
+        @keyframes trailFade {
+            0% { 
+                opacity: 0.9; 
+                transform: scale(1); 
+                box-shadow: 0 0 10px rgba(102, 126, 234, 0.6);
+            }
+            100% { 
+                opacity: 0; 
+                transform: scale(0.2); 
+                box-shadow: 0 0 0 rgba(102, 126, 234, 0);
+            }
+        }
+
+        .feature-tile.being-taken {
+            animation: featureTake 0.5s ease-out;
+        }
+
+        @keyframes featureTake {
+            0% { transform: scale(1) rotate(0deg); }
+            50% { transform: scale(1.1) rotate(5deg); }
+            100% { transform: scale(1) rotate(0deg); }
+        }
+
+        .board-slot.feature-added {
+            animation: featureAdd 0.5s ease-out;
+        }
+
+        @keyframes featureAdd {
+            0% { transform: scale(1); background: #f0f4ff; }
+            50% { transform: scale(1.05); background: #e8f5e8; }
+            100% { transform: scale(1); background: #f8fff8; }
+        }
+
         @media (max-width: 768px) {
             .building-area {
                 grid-template-columns: 1fr;
@@ -579,6 +616,16 @@
             
             .product-options {
                 grid-template-columns: 1fr;
+            }
+            
+            .cursor {
+                width: 16px;
+                height: 16px;
+            }
+            
+            .cursor-label {
+                font-size: 0.7rem;
+                top: -30px;
             }
         }
     </style>
@@ -702,7 +749,7 @@
     <script>
         const API_BASE = '/.netlify/functions/product-api';
         
-        // Game state
+        // Game state variables
         let gameState = 'entry';
         let gameId = null;
         let playerId = null;
@@ -715,7 +762,12 @@
         let connectionStatus = 'connected';
         let selectedOption = null;
 
-        // DOM Elements
+        // Cursor tracking variables
+        let cursors = new Map();
+        let lastCursorUpdate = 0;
+        let isDragging = false;
+
+        // DOM Elements helper
         const elements = {
             entryView: () => document.getElementById('entryView'),
             lobbyView: () => document.getElementById('lobbyView'),
@@ -729,23 +781,15 @@
             returnBtn: () => document.getElementById('returnBtn')
         };
 
-        // Cursor tracking variables
-        let cursors = new Map(); // Store cursor elements
-        let lastCursorUpdate = 0;
-        let isDragging = false;
-
         // Initialize cursor tracking
         function initializeCursorTracking() {
-            // Track mouse movement
             document.addEventListener('mousemove', (e) => {
                 if (gameState === 'building' && gameId && playerId) {
                     const now = Date.now();
                     
-                    // Only send updates every 100ms to avoid spam
                     if (now - lastCursorUpdate > 100) {
                         lastCursorUpdate = now;
                         
-                        // Send cursor position to server (don't await to avoid blocking)
                         apiCall('/game/cursor', {
                             method: 'POST',
                             body: JSON.stringify({
@@ -757,7 +801,6 @@
                         }).catch(err => console.warn('Cursor update failed:', err));
                     }
                     
-                    // Create drag trail effect when dragging
                     if (isDragging) {
                         createDragTrail(e.clientX, e.clientY);
                     }
@@ -772,12 +815,11 @@
             trail.style.top = y + 'px';
             document.body.appendChild(trail);
             
-            // Remove trail after animation
             setTimeout(() => {
                 if (trail.parentNode) {
                     document.body.removeChild(trail);
                 }
-            }, 500);
+            }, 600);
         }
 
         function updateCursors() {
@@ -788,19 +830,17 @@
             const now = Date.now();
             
             gameData.players.forEach(player => {
-                if (player.id === playerId) return; // Don't show own cursor
+                if (player.id === playerId) return;
                 
                 const cursor = player.cursor;
                 if (!cursor || !cursor.x || !cursor.y) return;
                 
-                // Check if cursor data is recent (within 10 seconds)
                 const lastUpdate = new Date(cursor.lastUpdate).getTime();
                 if (now - lastUpdate > 10000) return;
                 
                 let cursorElement = cursors.get(player.id);
                 
                 if (!cursorElement) {
-                    // Create new cursor element
                     cursorElement = document.createElement('div');
                     cursorElement.className = `cursor ${player.is_bot ? 'bot' : 'player'}`;
                     
@@ -813,20 +853,17 @@
                     cursors.set(player.id, cursorElement);
                 }
                 
-                // Update cursor position
                 cursorElement.style.left = cursor.x + 'px';
                 cursorElement.style.top = cursor.y + 'px';
                 
-                // Show action if bot just performed one
                 if (cursor.action && player.is_bot) {
                     const actionTime = new Date(cursor.action.timestamp).getTime();
-                    if (now - actionTime < 3000) { // Show action for 3 seconds
+                    if (now - actionTime < 4000) {
                         showCursorAction(cursorElement, cursor.action);
                     }
                 }
             });
             
-            // Clean up old cursors for players no longer in game
             const currentPlayerIds = new Set(gameData.players.map(p => p.id));
             for (const [playerId, cursorElement] of cursors) {
                 if (!currentPlayerIds.has(playerId)) {
@@ -839,41 +876,45 @@
         }
 
         function showCursorAction(cursorElement, action) {
-            // Remove existing action if any
             const existingAction = cursorElement.querySelector('.cursor-action');
             if (existingAction) {
                 existingAction.remove();
             }
             
             const actionElement = document.createElement('div');
-            actionElement.className = 'cursor-action';
+            actionElement.className = `cursor-action ${action.type}`;
             
             if (action.type === 'take') {
                 actionElement.textContent = `📦 ${action.feature}`;
-                actionElement.style.background = '#4CAF50';
             } else if (action.type === 'steal') {
                 actionElement.textContent = `💰 Stole ${action.feature}`;
-                actionElement.style.background = '#ff9800';
             }
             
             cursorElement.appendChild(actionElement);
             
-            // Remove action element after animation
             setTimeout(() => {
                 if (actionElement.parentNode) {
                     actionElement.remove();
                 }
-            }, 2000);
+            }, 3000);
         }
 
         function cleanupCursors() {
-            // Remove all cursor elements when leaving building stage
             for (const [playerId, cursorElement] of cursors) {
                 if (cursorElement.parentNode) {
                     document.body.removeChild(cursorElement);
                 }
             }
             cursors.clear();
+        }
+
+        function animateFeatureAdd(slotElement) {
+            if (slotElement) {
+                slotElement.classList.add('feature-added');
+                setTimeout(() => {
+                    slotElement.classList.remove('feature-added');
+                }, 500);
+            }
         }
 
         // Initialize game when page loads
@@ -886,7 +927,6 @@
         function initializeGame() {
             console.log('Initializing game...');
             
-            // Parse URL parameters
             const urlParams = new URLSearchParams(window.location.search);
             panelId = urlParams.get('panel') || urlParams.get('panelId') || '';
             returnUrl = urlParams.get('return') || urlParams.get('returnUrl') || '';
@@ -896,7 +936,6 @@
                 returnUrl = decodeURIComponent(returnUrl);
             }
 
-            // Show URL info if we have panel or return URL
             if (panelId || returnUrl) {
                 const urlInfo = document.getElementById('urlInfo');
                 if (urlInfo) {
@@ -908,10 +947,8 @@
                 }
             }
 
-            // Set up event listeners
             setupEventListeners();
 
-            // Auto-start if requested
             if (autoStartParam === 'true') {
                 playerName = 'Participant';
                 elements.playerNameInput().value = playerName;
@@ -922,13 +959,11 @@
         }
 
         function setupEventListeners() {
-            // Join game button
             const joinBtn = elements.joinGameBtn();
             if (joinBtn) {
                 joinBtn.addEventListener('click', handleJoinGame);
             }
 
-            // Enter key on name input
             const nameInput = elements.playerNameInput();
             if (nameInput) {
                 nameInput.addEventListener('keypress', function(e) {
@@ -938,13 +973,11 @@
                 });
             }
 
-            // Submit choice button
             const submitBtn = elements.submitChoiceBtn();
             if (submitBtn) {
                 submitBtn.addEventListener('click', submitConjointChoice);
             }
 
-            // Return button
             const returnBtn = elements.returnBtn();
             if (returnBtn) {
                 returnBtn.addEventListener('click', returnToSource);
@@ -979,66 +1012,28 @@
         function showView(viewName) {
             console.log('🎯 showView called with:', viewName);
             
-            // Validate that the view exists
             const targetView = document.getElementById(viewName);
             if (!targetView) {
                 console.error('❌ View not found:', viewName);
                 return;
             }
             
-            console.log('📋 Current view states before change:');
             const views = ['entryView', 'lobbyView', 'conjointView', 'buildingView', 'resultsView'];
             views.forEach(view => {
                 const el = document.getElementById(view);
                 if (el) {
-                    const isHidden = el.classList.contains('hidden');
-                    console.log(`  ${view}: ${isHidden ? 'HIDDEN' : 'VISIBLE'}`);
-                }
-            });
-            
-            // Hide all views first
-            views.forEach(view => {
-                const el = document.getElementById(view);
-                if (el) {
                     el.classList.add('hidden');
-                    el.style.display = 'none'; // Force hide with inline style too
+                    el.style.display = 'none';
                 }
             });
 
-            // Show the requested view
             targetView.classList.remove('hidden');
-            targetView.style.display = 'block'; // Force show with inline style
+            targetView.style.display = 'block';
             console.log('✅ Successfully set', viewName, 'to visible');
-            
-            // Verify the view is visible after a brief delay
-            setTimeout(() => {
-                const isHidden = targetView.classList.contains('hidden');
-                const displayStyle = window.getComputedStyle(targetView).display;
-                console.log('🔍 View visibility check:', viewName);
-                console.log('  - has hidden class:', isHidden);
-                console.log('  - computed display style:', displayStyle);
-                console.log('  - element dimensions:', {
-                    width: targetView.offsetWidth,
-                    height: targetView.offsetHeight
-                });
-                
-                if (isHidden || displayStyle === 'none') {
-                    console.error('❌ View failed to show properly:', viewName);
-                    // Force show again
-                    targetView.classList.remove('hidden');
-                    targetView.style.display = 'block';
-                    targetView.style.visibility = 'visible';
-                } else {
-                    console.log('✅ View is properly visible:', viewName);
-                }
-            }, 100);
         }
 
-        // API calls
         async function apiCall(endpoint, options = {}) {
             try {
-                console.log('API call:', endpoint, options);
-                
                 const response = await fetch(`${API_BASE}${endpoint}`, {
                     headers: {
                         'Content-Type': 'application/json',
@@ -1053,7 +1048,6 @@
                 
                 updateConnectionStatus('connected');
                 const data = await response.json();
-                console.log('API response:', data);
                 return data;
             } catch (error) {
                 console.error('API Error:', error);
@@ -1071,7 +1065,6 @@
             }
         }
 
-        // Game functions
         async function joinGame() {
             console.log('Attempting to join game with name:', playerName);
             
@@ -1081,7 +1074,6 @@
             }
             
             try {
-                // Disable join button
                 const joinBtn = elements.joinGameBtn();
                 if (joinBtn) {
                     joinBtn.disabled = true;
@@ -1109,7 +1101,6 @@
                 console.error('Failed to join game:', error);
                 showError('Failed to join game. Please try again.');
                 
-                // Re-enable join button
                 const joinBtn = elements.joinGameBtn();
                 if (joinBtn) {
                     joinBtn.disabled = false;
@@ -1125,70 +1116,43 @@
                 if (!gameId) return;
                 
                 try {
-                    // First, progress the game (handles timers and stage transitions)
                     await apiCall('/game/progress', {
                         method: 'POST',
                         body: JSON.stringify({ gameId })
                     });
                     
-                    // Then get the updated status
                     const status = await apiCall(`/game/status?gameId=${gameId}`);
                     const previousStage = gameData?.stage;
                     
                     gameData = status;
                     currentPlayer = status.players.find(p => p.id === playerId);
                     
-                    console.log('Game status update:', {
-                        stage: status.stage, 
-                        previousStage,
-                        players: status.players?.length,
-                        botCount: status.players?.filter(p => p.is_bot).length,
-                        timer: status.lobby_timer || status.round_timer
-                    });
-                    
-                    // Handle stage transitions
                     if (status.stage !== gameState) {
                         console.log('🔄 Stage changed from', gameState, 'to', status.stage);
-                        const previousGameState = gameState;
                         gameState = status.stage;
                         
-                        // Add a small delay to ensure DOM is ready
                         setTimeout(() => {
                             switch (status.stage) {
                                 case 'lobby':
-                                    console.log('🚪 Switching to lobby view');
                                     showView('lobbyView');
                                     break;
                                 case 'conjoint':
-                                    console.log('🎯 Switching to conjoint view with product options:', status.product_options?.length);
                                     showView('conjointView');
-                                    selectedOption = null; // Reset selection
-                                    // Emergency check - if conjoint view is not showing, force it
-                                    setTimeout(() => {
-                                        const conjointView = document.getElementById('conjointView');
-                                        if (conjointView && conjointView.classList.contains('hidden')) {
-                                            console.error('🚨 EMERGENCY: Conjoint view still hidden, forcing show');
-                                            conjointView.classList.remove('hidden');
-                                            conjointView.style.display = 'block';
-                                            conjointView.style.visibility = 'visible';
-                                        }
-                                    }, 200);
+                                    selectedOption = null;
                                     break;
                                 case 'building':
-                                    console.log('🏗️ Switching to building view');
                                     showView('buildingView');
                                     break;
                                 case 'completed':
-                                    console.log('🏆 Game completed, showing results');
+                                    cleanupCursors();
                                     showView('resultsView');
                                     clearInterval(updateInterval);
                                     updateResultsView();
                                     return;
                             }
-                        }, 50); // Small delay to ensure DOM updates
+                        }, 50);
                     }
                     
-                    // Update current view based on stage
                     switch (gameState) {
                         case 'lobby':
                             updateLobbyView();
@@ -1198,31 +1162,24 @@
                             break;
                         case 'building':
                             updateBuildingView();
-                            updateCursors(); // Update player cursors
+                            updateCursors();
                             break;
                     }
                     
                 } catch (error) {
                     console.error('Failed to update game status:', error);
-                    // Don't clear interval on temporary errors, but show status
                     updateConnectionStatus('disconnected');
                     setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, gameState === 'building' ? 2000 : 1000); // Slower updates during building to reduce conflicts
+            }, gameState === 'building' ? 2000 : 1000);
         }
 
         function updateLobbyView() {
-            if (!gameData) {
-                console.log('No game data available for lobby view');
-                return;
-            }
+            if (!gameData) return;
             
             const lobbyTimer = Math.max(0, gameData.lobby_timer || 0);
             const players = gameData.players || [];
             
-            console.log('Updating lobby view:', { lobbyTimer, playerCount: players.length });
-            
-            // Update status
             const statusEl = document.getElementById('lobbyStatus');
             if (statusEl) {
                 if (gameData.stage === 'conjoint') {
@@ -1234,14 +1191,12 @@
                 }
             }
             
-            // Update progress bar
             const progressBar = document.querySelector('#lobbyProgress .progress-bar');
             if (progressBar) {
                 const progress = ((20 - lobbyTimer) / 20) * 100;
                 progressBar.style.width = `${Math.max(0, Math.min(100, progress))}%`;
             }
             
-            // Update players list
             const playersContainer = document.getElementById('playersContainer');
             if (playersContainer) {
                 if (players.length === 0) {
@@ -1263,24 +1218,13 @@
         }
 
         function updateConjointView() {
-            if (!gameData) {
-                console.log('No game data available for conjoint view');
-                return;
-            }
+            if (!gameData) return;
             
-            console.log('Updating conjoint view:', { 
-                timer: gameData.round_timer,
-                optionsCount: gameData.product_options?.length,
-                currentChoice: currentPlayer?.conjoint_choice
-            });
-            
-            // Update timer
             const timerEl = document.getElementById('conjointTimer');
             if (timerEl) {
                 timerEl.textContent = `Time remaining: ${gameData.round_timer || 30}s`;
             }
             
-            // Update product options
             const optionsContainer = document.getElementById('productOptions');
             if (optionsContainer) {
                 if (!gameData.product_options || gameData.product_options.length === 0) {
@@ -1303,7 +1247,6 @@
                 }
             }
             
-            // Update submit button
             const submitBtn = elements.submitChoiceBtn();
             if (submitBtn) {
                 const hasSubmitted = currentPlayer?.conjoint_choice !== null;
@@ -1313,24 +1256,13 @@
         }
 
         function updateBuildingView() {
-            if (!gameData) {
-                console.log('No game data available for building view');
-                return;
-            }
+            if (!gameData) return;
             
-            console.log('Updating building view:', { 
-                timer: gameData.round_timer,
-                availableFeatures: gameData.available_features?.length,
-                playerBoard: currentPlayer?.board?.length
-            });
-            
-            // Update timer
             const timerEl = document.getElementById('buildingTimer');
             if (timerEl) {
                 timerEl.textContent = `Time remaining: ${gameData.round_timer || 60}s`;
             }
             
-            // Update available features
             const featuresGrid = document.getElementById('featuresGrid');
             if (featuresGrid) {
                 if (!gameData.available_features || gameData.available_features.length === 0) {
@@ -1346,7 +1278,6 @@
                 }
             }
             
-            // Update player board
             const playerBoard = document.getElementById('playerBoard');
             if (playerBoard && currentPlayer) {
                 const board = currentPlayer.board || [];
@@ -1370,7 +1301,6 @@
                 }
             }
             
-            // Update other players
             const otherPlayersContainer = document.getElementById('otherPlayersContainer');
             if (otherPlayersContainer && gameData.players) {
                 const otherPlayers = gameData.players.filter(p => p.id !== playerId);
@@ -1401,7 +1331,6 @@
         function updateResultsView() {
             if (!gameData) return;
             
-            // Create leaderboard
             const leaderboardContainer = document.getElementById('leaderboardContainer');
             if (leaderboardContainer && gameData.players) {
                 const sortedPlayers = [...gameData.players].sort((a, b) => (b.score || 0) - (a.score || 0));
@@ -1438,11 +1367,8 @@
         }
 
         function selectOption(optionIndex) {
-            if (currentPlayer?.conjoint_choice !== null) return; // Already submitted
+            if (currentPlayer?.conjoint_choice !== null) return;
             
-            console.log('Selected option:', optionIndex);
-            
-            // Update UI
             document.querySelectorAll('.product-option').forEach(el => 
                 el.classList.remove('selected'));
             
@@ -1453,7 +1379,6 @@
             
             selectedOption = optionIndex;
             
-            // Enable submit button
             const submitBtn = elements.submitChoiceBtn();
             if (submitBtn) {
                 submitBtn.disabled = false;
@@ -1462,8 +1387,6 @@
 
         async function submitConjointChoice() {
             if (selectedOption === null || currentPlayer?.conjoint_choice !== null) return;
-            
-            console.log('Submitting conjoint choice:', selectedOption);
             
             try {
                 const submitBtn = elements.submitChoiceBtn();
@@ -1481,36 +1404,23 @@
                     })
                 });
                 
-                // Update local state
                 if (currentPlayer) {
                     currentPlayer.conjoint_choice = selectedOption;
                 }
                 
-                console.log('Conjoint choice submitted successfully');
-                updateConjointView(); // Update UI to show submitted state
+                updateConjointView();
                 
             } catch (error) {
                 console.error('Failed to submit conjoint choice:', error);
                 showError('Failed to submit choice. Please try again.');
-                
-                const submitBtn = elements.submitChoiceBtn();
-                if (submitBtn) {
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Submit Choice';
-                }
             }
         }
 
         async function addFeatureToBoard(feature, slotIndex = null) {
-            if (!gameId || !playerId || gameState !== 'building') {
-                console.log('Cannot add feature - invalid state:', { gameId, playerId, gameState });
-                return;
-            }
-            
-            console.log('Adding feature to board:', feature, 'slot:', slotIndex);
+            if (!gameId || !playerId || gameState !== 'building') return;
             
             try {
-                const response = await apiCall('/game/build', {
+                await apiCall('/game/build', {
                     method: 'POST',
                     body: JSON.stringify({
                         gameId,
@@ -1521,9 +1431,6 @@
                     })
                 });
                 
-                console.log('Feature add response:', response);
-                
-                // Immediately update local state for responsiveness
                 if (currentPlayer && currentPlayer.board.length < 4) {
                     if (slotIndex !== null && slotIndex < 4) {
                         currentPlayer.board[slotIndex] = feature;
@@ -1531,7 +1438,6 @@
                         currentPlayer.board.push(feature);
                     }
                     
-                    // Remove from available features locally
                     if (gameData && gameData.available_features) {
                         const featureIndex = gameData.available_features.indexOf(feature);
                         if (featureIndex !== -1) {
@@ -1539,7 +1445,6 @@
                         }
                     }
                     
-                    // Update UI immediately
                     updateBuildingView();
                 }
                 
@@ -1550,15 +1455,10 @@
         }
 
         async function stealFeature(sourcePlayerId, feature, targetSlot) {
-            if (!gameId || !playerId || gameState !== 'building') {
-                console.log('Cannot steal feature - invalid state');
-                return;
-            }
-            
-            console.log('Stealing feature:', feature, 'from:', sourcePlayerId, 'to slot:', targetSlot);
+            if (!gameId || !playerId || gameState !== 'building') return;
             
             try {
-                const response = await apiCall('/game/build', {
+                await apiCall('/game/build', {
                     method: 'POST',
                     body: JSON.stringify({
                         gameId,
@@ -1570,9 +1470,6 @@
                     })
                 });
                 
-                console.log('Feature steal response:', response);
-                
-                // Immediately update local state for responsiveness
                 if (currentPlayer && gameData && gameData.players) {
                     const sourcePlayer = gameData.players.find(p => p.id === sourcePlayerId);
                     if (sourcePlayer) {
@@ -1586,7 +1483,6 @@
                                 currentPlayer.board.push(feature);
                             }
                             
-                            // Update UI immediately
                             updateBuildingView();
                         }
                     }
@@ -1599,8 +1495,6 @@
         }
 
         function handleDragStart(event, feature, sourcePlayerId = null) {
-            console.log('Drag start:', feature, 'from player:', sourcePlayerId);
-            
             isDragging = true;
             
             event.dataTransfer.setData('text/plain', feature);
@@ -1611,7 +1505,6 @@
             
             event.target.classList.add('dragging');
             
-            // Highlight valid drop targets
             const playerBoardSlots = document.querySelectorAll('#playerBoard .board-slot:not(.filled)');
             playerBoardSlots.forEach(slot => {
                 slot.classList.add(sourcePlayerId ? 'steal-target' : 'can-drop');
@@ -1622,7 +1515,6 @@
             isDragging = false;
             event.target.classList.remove('dragging');
             
-            // Remove highlighting from all board slots
             const allBoardSlots = document.querySelectorAll('.board-slot');
             allBoardSlots.forEach(slot => {
                 slot.classList.remove('can-drop', 'steal-target');
@@ -1636,23 +1528,14 @@
             const feature = event.dataTransfer.getData('text/plain');
             const sourcePlayerId = event.dataTransfer.getData('source-player');
             
-            console.log('Drop:', feature, 'to slot:', slotIndex, 'from player:', sourcePlayerId);
+            if (!feature) return;
             
-            if (!feature) {
-                console.error('No feature data in drop event');
-                return;
-            }
-            
-            // Check if slot is already filled
             if (currentPlayer && currentPlayer.board && currentPlayer.board[slotIndex]) {
-                console.log('Slot already filled, cannot drop');
                 showNotification('Slot is already filled!', 'error');
                 return;
             }
             
-            // Check if player board is full
             if (currentPlayer && currentPlayer.board && currentPlayer.board.length >= 4) {
-                console.log('Board is full, cannot drop');
                 showNotification('Your board is full!', 'error');
                 return;
             }
@@ -1663,7 +1546,6 @@
                 addFeatureToBoard(feature, slotIndex);
             }
             
-            // Remove highlighting
             event.target.classList.remove('can-drop', 'steal-target');
         }
 
@@ -1673,8 +1555,6 @@
         }
 
         function showNotification(message, type = 'success') {
-            console.log('Notification:', message, type);
-            
             const notification = document.createElement('div');
             const bgColor = type === 'error' ? '#dc3545' : '#28a745';
             notification.style.cssText = `
@@ -1700,27 +1580,9 @@
             }, 4000);
         }
 
-        function getFeatureRating(feature) {
-            if (!gameData?.feature_stats?.[feature]) return 1;
-            
-            const stats = gameData.feature_stats[feature];
-            const totalScore = stats.conjoint_selections * 10 + stats.build_selections * 5;
-            
-            if (totalScore >= 40) return 5;
-            if (totalScore >= 30) return 4;
-            if (totalScore >= 20) return 3;
-            if (totalScore >= 10) return 2;
-            return 1;
-        }
-
         function getOverallRating(player) {
             if (!player.board || player.board.length === 0) return 1;
-            
-            const avgRating = player.board.reduce((sum, feature) => {
-                return sum + getFeatureRating(feature);
-            }, 0) / player.board.length;
-            
-            return Math.round(avgRating);
+            return Math.min(5, Math.max(1, Math.ceil(player.board.length * 1.25)));
         }
 
         function renderStars(rating, maxStars = 5) {
@@ -1732,8 +1594,6 @@
         }
 
         function returnToSource() {
-            console.log('Returning to source, returnUrl:', returnUrl);
-            
             if (updateInterval) {
                 clearInterval(updateInterval);
             }
@@ -1745,7 +1605,6 @@
                     url.searchParams.set('completed', 'true');
                     url.searchParams.set('score', currentPlayer?.score || 0);
                     
-                    console.log('Redirecting to:', url.toString());
                     window.location.href = url.toString();
                 } catch (error) {
                     console.error('Error parsing return URL:', error);
@@ -1758,71 +1617,13 @@
             }
         }
 
-        // Add drag event listeners globally
-        document.addEventListener('dragend', handleDragEnd);
-        
         // Global error handler
         window.addEventListener('error', function(e) {
             console.error('Global error:', e.error);
             updateConnectionStatus('disconnected');
         });
 
-        // Global debugging functions
-        window.debugGameState = function() {
-            console.log('🐛 GAME DEBUG INFO:');
-            console.log('Current gameState:', gameState);
-            console.log('Game data:', gameData);
-            console.log('Current player:', currentPlayer);
-            console.log('Game ID:', gameId);
-            console.log('Player ID:', playerId);
-            
-            console.log('\n🔍 VIEW STATES:');
-            const views = ['entryView', 'lobbyView', 'conjointView', 'buildingView', 'resultsView'];
-            views.forEach(view => {
-                const el = document.getElementById(view);
-                if (el) {
-                    const isHidden = el.classList.contains('hidden');
-                    const displayStyle = window.getComputedStyle(el).display;
-                    console.log(`${view}:`, {
-                        hidden: isHidden,
-                        display: displayStyle,
-                        dimensions: { width: el.offsetWidth, height: el.offsetHeight }
-                    });
-                } else {
-                    console.log(`${view}: NOT FOUND`);
-                }
-            });
-        };
-
-        window.forceShowConjoint = function() {
-            console.log('🚨 FORCE SHOWING CONJOINT VIEW');
-            const conjointView = document.getElementById('conjointView');
-            if (conjointView) {
-                conjointView.classList.remove('hidden');
-                conjointView.style.display = 'block';
-                conjointView.style.visibility = 'visible';
-                conjointView.style.opacity = '1';
-                console.log('✅ Conjoint view forced to show');
-                updateConjointView();
-            } else {
-                console.error('❌ Conjoint view element not found!');
-            }
-        };
-
-        window.forceShowResults = function() {
-            console.log('🚨 FORCE SHOWING RESULTS VIEW');
-            const resultsView = document.getElementById('resultsView');
-            if (resultsView) {
-                resultsView.classList.remove('hidden');
-                resultsView.style.display = 'block';
-                resultsView.style.visibility = 'visible';
-                resultsView.style.opacity = '1';
-                console.log('✅ Results view forced to show');
-                updateResultsView();
-            } else {
-                console.error('❌ Results view element not found!');
-            }
-        };
+        document.addEventListener('dragend', handleDragEnd);
     </script>
 </body>
 </html>
