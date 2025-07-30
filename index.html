@@ -639,6 +639,8 @@
                                     break;
                                 case 'building':
                                     showView('buildingView');
+                                    // Force immediate update to show bots
+                                    updateBuildingView();
                                     break;
                                 case 'completed':
                                     cleanupCursors();
@@ -668,7 +670,7 @@
                     updateConnectionStatus('disconnected');
                     setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, gameState === 'building' ? 2000 : 1000);
+            }, gameState === 'building' ? 1000 : 1000); // Faster updates during building phase
         }
 
         function updateLobbyView() {
@@ -929,22 +931,9 @@
                     })
                 });
                 
-                if (currentPlayer && currentPlayer.board.length < 4) {
-                    if (slotIndex !== null && slotIndex < 4) {
-                        currentPlayer.board[slotIndex] = feature;
-                    } else {
-                        currentPlayer.board.push(feature);
-                    }
-                    
-                    if (gameData && gameData.available_features) {
-                        const featureIndex = gameData.available_features.indexOf(feature);
-                        if (featureIndex !== -1) {
-                            gameData.available_features.splice(featureIndex, 1);
-                        }
-                    }
-                    
-                    updateBuildingView();
-                }
+                // Don't update the UI optimistically - wait for server response
+                // This prevents conflicts with bot actions
+                console.log(`Feature ${feature} added successfully`);
                 
             } catch (error) {
                 console.error('Failed to add feature:', error);
@@ -968,23 +957,8 @@
                     })
                 });
                 
-                if (currentPlayer && gameData && gameData.players) {
-                    const sourcePlayer = gameData.players.find(p => p.id === sourcePlayerId);
-                    if (sourcePlayer) {
-                        const featureIndex = sourcePlayer.board.indexOf(feature);
-                        if (featureIndex !== -1) {
-                            sourcePlayer.board.splice(featureIndex, 1);
-                            
-                            if (targetSlot !== null && targetSlot < 4) {
-                                currentPlayer.board[targetSlot] = feature;
-                            } else {
-                                currentPlayer.board.push(feature);
-                            }
-                            
-                            updateBuildingView();
-                        }
-                    }
-                }
+                // Don't update the UI optimistically - wait for server response
+                console.log(`Feature ${feature} stolen successfully`);
                 
             } catch (error) {
                 console.error('Failed to steal feature:', error);
