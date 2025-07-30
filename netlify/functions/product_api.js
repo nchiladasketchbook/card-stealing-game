@@ -1172,6 +1172,27 @@ async function handleBuildAction(body) {
         }
       }
     }
+      // Steal feature from another player
+      const sourcePlayerIndex = players.findIndex(p => p.id === sourcePlayerId);
+      if (sourcePlayerIndex !== -1) {
+        const sourcePlayer = players[sourcePlayerIndex];
+        const featureIndex = sourcePlayer.board.indexOf(feature);
+        if (featureIndex !== -1 && player.board.length < 4) {
+          sourcePlayer.board.splice(featureIndex, 1);
+          
+          if (slotIndex !== null && slotIndex < 4) {
+            player.board[slotIndex] = feature;
+          } else {
+            player.board.push(feature);
+          }
+          
+          // Update stats
+          if (featureStats[feature]) {
+            featureStats[feature].build_selections++;
+          }
+        }
+      }
+    }
     
     const { error } = await supabase
       .from('product_games')
