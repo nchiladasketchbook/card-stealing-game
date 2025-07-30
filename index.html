@@ -330,7 +330,9 @@
                     // Animate stars for this feature
                     setTimeout(() => {
                         const stars = item.querySelectorAll('.feature-star');
-                        const starCount = parseInt(stars[0]?.dataset.stars || 0);
+                        const starCount = parseInt(item.dataset.starCount) || 1;
+                        
+                        console.log(`Animating ${starCount} stars for feature at index ${index}`);
                         
                         stars.forEach((star, starIndex) => {
                             if (starIndex < starCount) {
