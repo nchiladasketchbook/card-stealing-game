@@ -1,5 +1,7 @@
 // netlify/functions/product-api.js
-const { createClient } = require('@supabase/supabase-js');
+const { createClient }
+
+exports.handler = async (event, context) => { = require('@supabase/supabase-js');
 
 // Initialize Supabase client with better error handling
 let supabase;
@@ -91,7 +93,116 @@ function createBot(usedNames) {
   };
 }
 
-exports.handler = async (event, context) => {
+// Calculate scores based on historical feature performance across all games
+async function calculateHistoricalScores(players, currentFeatureStats, currentGameId) {
+  try {
+    // Get all completed games to calculate historical averages
+    const { data: allGames, error } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('stage', 'completed')
+      .neq('id', currentGameId); // Exclude current game from history
+    
+    if (error) {
+      console.error('Error fetching historical games:', error);
+      // Fallback to current game scoring if historical data unavailable
+      return players.map(player => ({ ...player, score: 0 }));
+    }
+    
+    console.log(`Found ${allGames?.length || 0} historical games for scoring`);
+    
+    // Calculate historical averages for each feature
+    const featureHistoricalScores = {};
+    const featureUsageCounts = {};
+    
+    // Initialize counters
+    AVAILABLE_FEATURES.forEach(feature => {
+      featureHistoricalScores[feature] = 0;
+      featureUsageCounts[feature] = 0;
+    });
+    
+    // Process historical games
+    if (allGames && allGames.length > 0) {
+      allGames.forEach(game => {
+        if (game.feature_stats) {
+          Object.keys(game.feature_stats).forEach(feature => {
+            const stats = game.feature_stats[feature];
+            if (stats && (stats.build_selections > 0 || stats.conjoint_selections > 0)) {
+              // Score includes both building and conjoint for historical data
+              const gameScore = (stats.build_selections * 5) + (stats.conjoint_selections * 3);
+              featureHistoricalScores[feature] += gameScore;
+              featureUsageCounts[feature]++;
+            }
+          });
+        }
+      });
+    }
+    
+    // For the very first game, include conjoint scores in the current game
+    const isFirstGame = !allGames || allGames.length === 0;
+    if (isFirstGame) {
+      console.log('First game detected - including conjoint scores');
+      Object.keys(currentFeatureStats).forEach(feature => {
+        const stats = currentFeatureStats[feature];
+        if (stats) {
+          // Include conjoint scores for the first game only
+          const currentGameScore = (stats.build_selections * 5) + (stats.conjoint_selections * 3);
+          featureHistoricalScores[feature] += currentGameScore;
+          featureUsageCounts[feature]++;
+        }
+      });
+    } else {
+      // For subsequent games, only add building scores from current game
+      Object.keys(currentFeatureStats).forEach(feature => {
+        const stats = currentFeatureStats[feature];
+        if (stats && stats.build_selections > 0) {
+          const currentGameScore = stats.build_selections * 5;
+          featureHistoricalScores[feature] += currentGameScore;
+          featureUsageCounts[feature]++;
+        }
+      });
+    }
+    
+    // Calculate average scores per feature
+    const featureAverageScores = {};
+    Object.keys(featureHistoricalScores).forEach(feature => {
+      if (featureUsageCounts[feature] > 0) {
+        featureAverageScores[feature] = featureHistoricalScores[feature] / featureUsageCounts[feature];
+      } else {
+        featureAverageScores[feature] = 0;
+      }
+    });
+    
+    console.log('Feature average scores calculated:', featureAverageScores);
+    
+    // Calculate player scores based on their selected features' average performance
+    const scoredPlayers = players.map(player => {
+      let score = 0;
+      
+      if (player.board && player.board.length > 0) {
+        player.board.forEach(feature => {
+          if (featureAverageScores[feature] !== undefined) {
+            score += featureAverageScores[feature];
+          }
+        });
+      }
+      
+      // Round to 2 decimal places
+      score = Math.round(score * 100) / 100;
+      
+      return { ...player, score };
+    });
+    
+    console.log('Player scores calculated:', scoredPlayers.map(p => ({ name: p.name, score: p.score })));
+    
+    return scoredPlayers;
+    
+  } catch (error) {
+    console.error('Error calculating historical scores:', error);
+    // Fallback scoring
+    return players.map(player => ({ ...player, score: 0 }));
+  }
+}
   console.log('Function invoked:', {
     path: event.path,
     method: event.httpMethod
@@ -352,8 +463,52 @@ async function downloadFeatureScores(requestHeaders) {
     
     if (error) throw error;
     
-    // Generate feature scores CSV
-    let csv = 'Game ID,Player Name,Panel ID,Feature,Feature Score,Total Player Score,Game Date\n';
+    // Calculate historical feature averages
+    const featureHistoricalScores = {};
+    const featureUsageCounts = {};
+    
+    // Initialize counters
+    AVAILABLE_FEATURES.forEach(feature => {
+      featureHistoricalScores[feature] = 0;
+      featureUsageCounts[feature] = 0;
+    });
+    
+    // Process all games to build historical averages
+    games.forEach((game, gameIndex) => {
+      const isFirstGame = gameIndex === games.length - 1; // Last in descending order = first chronologically
+      
+      if (game.feature_stats) {
+        Object.keys(game.feature_stats).forEach(feature => {
+          const stats = game.feature_stats[feature];
+          if (stats && (stats.build_selections > 0 || stats.conjoint_selections > 0)) {
+            let gameScore;
+            if (isFirstGame) {
+              // Include conjoint scores for the very first game
+              gameScore = (stats.build_selections * 5) + (stats.conjoint_selections * 3);
+            } else {
+              // Only building scores for subsequent games
+              gameScore = stats.build_selections * 5;
+            }
+            
+            featureHistoricalScores[feature] += gameScore;
+            featureUsageCounts[feature]++;
+          }
+        });
+      }
+    });
+    
+    // Calculate average scores
+    const featureAverageScores = {};
+    Object.keys(featureHistoricalScores).forEach(feature => {
+      if (featureUsageCounts[feature] > 0) {
+        featureAverageScores[feature] = Math.round((featureHistoricalScores[feature] / featureUsageCounts[feature]) * 100) / 100;
+      } else {
+        featureAverageScores[feature] = 0;
+      }
+    });
+    
+    // Generate feature scores CSV with historical averages
+    let csv = 'Game ID,Player Name,Panel ID,Feature,Feature Historical Average,Player Total Score,Game Date\n';
     
     games.forEach(game => {
       if (game.players && game.feature_stats) {
@@ -362,11 +517,9 @@ async function downloadFeatureScores(requestHeaders) {
         realPlayers.forEach(player => {
           if (player.board && player.board.length > 0) {
             player.board.forEach(feature => {
-              const featureStats = game.feature_stats[feature];
-              // New scoring: only building selections count (no conjoint bonus)
-              const featureScore = featureStats ? featureStats.build_selections * 5 : 0;
+              const featureAverage = featureAverageScores[feature] || 0;
               
-              csv += `"${game.id}","${player.name}","${player.panel_id || ''}","${feature}","${featureScore}","${player.score || 0}","${game.created_at}"\n`;
+              csv += `"${game.id}","${player.name}","${player.panel_id || ''}","${feature}","${featureAverage}","${player.score || 0}","${game.created_at}"\n`;
             });
           }
         });
@@ -378,7 +531,7 @@ async function downloadFeatureScores(requestHeaders) {
       headers: {
         ...headers,
         'Content-Type': 'text/csv',
-        'Content-Disposition': 'attachment; filename="feature_scores.csv"'
+        'Content-Disposition': 'attachment; filename="feature_historical_scores.csv"'
       },
       body: csv
     };
@@ -826,22 +979,8 @@ async function progressGame(body) {
       if (newRoundTimer <= 0) {
         console.log('Building timer expired, ending game');
         
-        // Calculate final scores - UPDATED SCORING: No conjoint bonus, only building selections
-        const players = game.players.map(player => {
-          let score = 0;
-          
-          if (player.board) {
-            player.board.forEach(feature => {
-              if (game.feature_stats[feature]) {
-                const stats = game.feature_stats[feature];
-                // CHANGED: Only count build selections (no conjoint bonus)
-                score += stats.build_selections * 5;
-              }
-            });
-          }
-          
-          return { ...player, score };
-        });
+        // Calculate final scores - UPDATED SCORING: Based on historical feature performance
+        const players = await calculateHistoricalScores(game.players, game.feature_stats, gameId);
         
         updatedFields = {
           stage: 'completed',
