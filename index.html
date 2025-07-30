@@ -15,9 +15,10 @@
                             </div>
                         </div>
                         
-                        <div class="other-players">
-                            <div id="otherPlayersContainer">
-                                <!-- Other players will be populated here -->
+                        <div class="bot-players-section">
+                            <h3>Other Players' Boards</h3>
+                            <div class="bot-players-grid" id="botPlayersContainer">
+                                <!-- Bot players will be populated here -->
                             </div>
                         </div>
                     </div>
@@ -810,17 +811,17 @@
                 }
             }
             
-            const otherPlayersContainer = document.getElementById('otherPlayersContainer');
-            if (otherPlayersContainer && gameData.players) {
+            const botPlayersContainer = document.getElementById('botPlayersContainer');
+            if (botPlayersContainer && gameData.players) {
                 const otherPlayers = gameData.players.filter(p => p.id !== playerId);
                 
                 if (otherPlayers.length === 0) {
-                    otherPlayersContainer.innerHTML = '<div style="text-align: center; color: #666;">No other players</div>';
+                    botPlayersContainer.innerHTML = '<div style="text-align: center; color: #666; grid-column: 1 / -1;">No other players</div>';
                 } else {
-                    otherPlayersContainer.innerHTML = otherPlayers.map(player => `
-                        <div class="other-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
-                            <h4>${player.name || 'Unknown'} ${player.is_bot ? '🤖' : ''}</h4>
-                            <div class="other-player-features">
+                    botPlayersContainer.innerHTML = otherPlayers.map(player => `
+                        <div class="bot-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
+                            <h4 style="margin-bottom: 10px; text-align: center;">${player.name || 'Unknown'} ${player.is_bot ? '🤖' : ''}</h4>
+                            <div class="bot-player-features">
                                 ${Array.from({length: 4}, (_, i) => `
                                     <div class="feature-slot ${player.board && player.board[i] ? 'filled' : 'empty'}"
                                          ${player.board && player.board[i] ? 
@@ -830,7 +831,7 @@
                                 `).join('')}
                             </div>
                             ${player.board && player.board.length > 0 ? 
-                                '<div class="steal-hint">Click and drag features to steal them!</div>' : ''}
+                                '<div class="steal-hint" style="text-align: center;">Click and drag features to steal them!</div>' : ''}
                         </div>
                     `).join('');
                 }
@@ -1613,7 +1614,55 @@
             background: #f8f9fa;
             border-radius: 12px;
             padding: 20px;
-            min-height: 400px;
+            min-height: 300px;
+        }
+
+        .bot-players-section {
+            background: #f8f9fa;
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 10px;
+        }
+
+        .bot-players-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .bot-player {
+            background: white;
+            border: 2px solid #e1e5e9;
+            border-radius: 8px;
+            padding: 15px;
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+
+        .bot-player:hover {
+            border-color: #667eea;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .bot-player.has-features {
+            border-color: #28a745;
+            background: #f8fff8;
+        }
+
+        .bot-player.has-features:hover {
+            border-color: #667eea;
+            background: #f0f4ff;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .bot-player-features {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin: 10px 0;
+            min-height: 60px;
         }
 
         .features-grid {

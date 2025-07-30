@@ -103,6 +103,14 @@
             background: #45a049;
         }
         
+        .form-button.info {
+            background: #2196F3;
+        }
+        
+        .form-button.info:hover {
+            background: #1976D2;
+        }
+        
         .features-grid {
             display: grid;
             grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
@@ -194,6 +202,12 @@
             font-weight: 600;
         }
         
+        .download-buttons {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
         .hidden {
             display: none;
         }
@@ -228,6 +242,10 @@
             .stats-grid {
                 grid-template-columns: 1fr;
             }
+            
+            .download-buttons {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
@@ -243,20 +261,24 @@
             <h2 style="text-align: center; margin-bottom: 20px;">Admin Login</h2>
             <div class="form-group">
                 <label class="form-label">Password:</label>
-                <input type="password" id="adminPassword" class="form-input" placeholder="Enter admin password">
+                <input type="password" id="adminPassword" class="form-input" placeholder="Default: admin123">
             </div>
             <button id="loginButton" class="form-button" style="width: 100%;">Login</button>
             <div id="loginError" class="error" style="display: none;"></div>
+            <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
+                Default password: <strong>admin123</strong>
+            </div>
         </div>
 
         <!-- Admin Panel -->
         <div id="adminPanel" class="admin-panel hidden">
             <!-- Stats Section -->
             <div class="stats-section">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; flex-wrap: wrap; gap: 15px;">
                     <h2>Game Statistics</h2>
-                    <div style="display: flex; gap: 15px;">
-                        <button id="downloadButton" class="form-button success">📊 Download Game Data CSV</button>
+                    <div class="download-buttons">
+                        <button id="downloadButton" class="form-button success">📊 Download Game Data</button>
+                        <button id="downloadFeatureScoresButton" class="form-button info">⭐ Download Feature Scores</button>
                         <button id="refreshStatsButton" class="form-button">🔄 Refresh</button>
                         <button id="logoutButton" class="form-button danger">Logout</button>
                     </div>
@@ -314,30 +336,45 @@
         async function login() {
             const password = document.getElementById('adminPassword').value;
             const errorDiv = document.getElementById('loginError');
+            const loginButton = document.getElementById('loginButton');
+            
+            // Clear previous errors
+            errorDiv.style.display = 'none';
+            loginButton.disabled = true;
+            loginButton.textContent = 'Logging in...';
             
             try {
+                console.log('Attempting login with password:', password ? 'PROVIDED' : 'EMPTY');
+                
                 const response = await fetch(API_BASE + '/admin/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ password: password })
                 });
                 
+                console.log('Login response status:', response.status);
                 const data = await response.json();
+                console.log('Login response data:', data);
                 
-                if (response.ok) {
+                if (response.ok && data.token) {
                     authToken = data.token;
+                    console.log('Login successful, token:', authToken);
                     document.getElementById('loginForm').classList.add('hidden');
                     document.getElementById('adminPanel').classList.remove('hidden');
                     loadFeatures();
                     loadStats();
                 } else {
-                    errorDiv.textContent = data.error || 'Login failed';
+                    errorDiv.textContent = data.error || 'Login failed - check password';
                     errorDiv.style.display = 'block';
+                    console.error('Login failed:', data);
                 }
             } catch (error) {
                 errorDiv.textContent = 'Connection error. Please try again.';
                 errorDiv.style.display = 'block';
                 console.error('Login error:', error);
+            } finally {
+                loginButton.disabled = false;
+                loginButton.textContent = 'Login';
             }
         }
 
@@ -351,10 +388,18 @@
 
         // Download functionality
         async function downloadGameData() {
+            if (!authToken) {
+                alert('Please login first');
+                return;
+            }
+            
             try {
+                console.log('Downloading game data with token:', authToken);
                 const response = await fetch(API_BASE + '/admin/download', {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
+                
+                console.log('Download response status:', response.status);
                 
                 if (response.ok) {
                     const blob = await response.blob();
@@ -368,7 +413,44 @@
                     window.URL.revokeObjectURL(url);
                     document.body.removeChild(a);
                 } else {
-                    alert('Error downloading game data');
+                    const errorData = await response.json();
+                    alert('Error downloading game data: ' + (errorData.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Connection error. Please try again.');
+                console.error('Download error:', error);
+            }
+        }
+
+        // NEW: Download feature scores functionality
+        async function downloadFeatureScores() {
+            if (!authToken) {
+                alert('Please login first');
+                return;
+            }
+            
+            try {
+                console.log('Downloading feature scores with token:', authToken);
+                const response = await fetch(API_BASE + '/admin/feature-scores', {
+                    headers: { 'Authorization': 'Bearer ' + authToken }
+                });
+                
+                console.log('Feature scores download response status:', response.status);
+                
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = 'feature_scores.csv';
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else {
+                    const errorData = await response.json();
+                    alert('Error downloading feature scores: ' + (errorData.error || 'Unknown error'));
                 }
             } catch (error) {
                 alert('Connection error. Please try again.');
@@ -409,12 +491,20 @@
 
         // Feature management
         async function loadFeatures() {
+            if (!authToken) {
+                console.error('No auth token for loading features');
+                return;
+            }
+            
             try {
+                console.log('Loading features with token:', authToken);
                 const response = await fetch(API_BASE + '/admin/features', {
                     headers: { 'Authorization': 'Bearer ' + authToken }
                 });
                 
+                console.log('Features response status:', response.status);
                 const features = await response.json();
+                console.log('Features data:', features);
                 displayFeatures(features);
             } catch (error) {
                 console.error('Error loading features:', error);
@@ -425,8 +515,8 @@
         function displayFeatures(features) {
             const grid = document.getElementById('featuresGrid');
             
-            if (features.length === 0) {
-                grid.innerHTML = '<div style="text-align: center; color: #666;">No features found. Add some features to get started.</div>';
+            if (!Array.isArray(features) || features.length === 0) {
+                grid.innerHTML = '<div style="text-align: center; color: #666;">No features found. Features are read-only in this demo.</div>';
                 return;
             }
             
@@ -436,8 +526,7 @@
                         <div class="feature-name">${feature.name}</div>
                         <div class="feature-category">${feature.category || 'Uncategorized'}</div>
                         <div class="feature-actions">
-                            <button onclick="editFeature(${feature.id})" class="form-button">Edit</button>
-                            <button onclick="deleteFeature(${feature.id})" class="form-button danger">Delete</button>
+                            <button onclick="alert('Feature editing coming soon')" class="form-button">View</button>
                         </div>
                     </div>
                 `;
@@ -454,30 +543,13 @@
                 return;
             }
             
-            try {
-                const response = await fetch(API_BASE + '/admin/features', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': 'Bearer ' + authToken,
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        name: name,
-                        category: category
-                    })
-                });
-                
-                if (response.ok) {
-                    messageDiv.innerHTML = '<div class="success">Feature added successfully!</div>';
-                    clearAddForm();
-                    loadFeatures();
-                } else {
-                    const error = await response.json();
-                    messageDiv.innerHTML = '<div class="error">' + (error.error || 'Error adding feature') + '</div>';
-                }
-            } catch (error) {
-                messageDiv.innerHTML = '<div class="error">Connection error. Please try again.</div>';
-            }
+            messageDiv.innerHTML = '<div class="error">Feature management is read-only in this demo</div>';
+            
+            // Clear the form
+            setTimeout(() => {
+                clearAddForm();
+                messageDiv.innerHTML = '';
+            }, 3000);
         }
 
         function clearAddForm() {
@@ -485,19 +557,27 @@
             document.getElementById('newFeatureCategory').value = 'Design';
         }
 
-        async function editFeature(id) {
-            const card = document.querySelector('[data-id="' + id + '"]');
-            const name = card.querySelector('.feature-name').textContent;
-            const category = card.querySelector('.feature-category').textContent;
+        // Event listeners
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Admin panel loaded');
             
-            const newName = prompt('Feature name:', name);
-            if (!newName) return;
+            document.getElementById('loginButton').addEventListener('click', login);
+            document.getElementById('logoutButton').addEventListener('click', logout);
+            document.getElementById('downloadButton').addEventListener('click', downloadGameData);
+            document.getElementById('downloadFeatureScoresButton').addEventListener('click', downloadFeatureScores);
+            document.getElementById('refreshStatsButton').addEventListener('click', loadStats);
+            document.getElementById('addFeatureButton').addEventListener('click', addFeature);
             
-            const newCategory = prompt('Category:', category);
-            if (!newCategory) return;
+            document.getElementById('adminPassword').addEventListener('keypress', function(e) {
+                if (e.key === 'Enter') {
+                    login();
+                }
+            });
             
-            try {
-                const response = await fetch(API_BASE + '/admin/features', {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': 'Bearer ' + authToken,
+            // Show helpful info about default password
+            const passwordInput = document.getElementById('adminPassword');
+            passwordInput.placeholder = 'Default: admin123';
+        });
+    </script>
+</body>
+</html>
