@@ -1136,6 +1136,20 @@ async function handleBuildAction(body) {
           featureStats[feature].build_selections++;
         }
       }
+    } else if (action === 'remove') {
+      // NEW: Remove feature from player's board and return to pool
+      const featureIndex = player.board.indexOf(feature);
+      if (featureIndex !== -1) {
+        player.board.splice(featureIndex, 1);
+        availableFeatures.push(feature);
+        
+        // Update stats (decrease count)
+        if (featureStats[feature] && featureStats[feature].build_selections > 0) {
+          featureStats[feature].build_selections--;
+        }
+        
+        console.log(`Player ${player.name} removed ${feature} from their board`);
+      }
     } else if (action === 'steal') {
       // Steal feature from another player
       const sourcePlayerIndex = players.findIndex(p => p.id === sourcePlayerId);

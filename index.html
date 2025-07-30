@@ -75,6 +75,8 @@
         let cursors = new Map();
         let lastCursorUpdate = 0;
         let isDragging = false;
+        let draggedFeature = null; // Track what's being dragged
+        let dragTimeout = null; // Safety timeout for drag operations
 
         // DOM Elements helper
         const elements = {
@@ -768,7 +770,8 @@
             console.log('updateBuildingView called with:', {
                 players: gameData.players?.length || 0,
                 availableFeatures: gameData.available_features?.length || 0,
-                currentPlayer: currentPlayer?.name || 'unknown'
+                currentPlayer: currentPlayer?.name || 'unknown',
+                isDragging: isDragging
             });
             
             const timerEl = document.getElementById('buildingTimer');
@@ -781,13 +784,31 @@
                 if (!gameData.available_features || gameData.available_features.length === 0) {
                     featuresGrid.innerHTML = '<div style="text-align: center; color: #666;">No features available</div>';
                 } else {
-                    featuresGrid.innerHTML = gameData.available_features.map(feature => `
-                        <div class="feature-tile" draggable="true" 
-                             ondragstart="handleDragStart(event, '${feature}')"
-                             ondragend="handleDragEnd(event)">
-                            ${feature}
-                        </div>
-                    `).join('');
+                    // SMART UPDATE: Only update if the features have actually changed OR not currently dragging
+                    const currentFeaturesList = Array.from(featuresGrid.querySelectorAll('.feature-tile')).map(el => el.textContent.trim());
+                    const newFeaturesList = gameData.available_features;
+                    
+                    // Check if the feature lists are different
+                    const featuresChanged = JSON.stringify(currentFeaturesList.sort()) !== JSON.stringify(newFeaturesList.sort());
+                    
+                    if (!isDragging || featuresChanged) {
+                        if (isDragging && featuresChanged) {
+                            console.log('Features changed during drag - updating anyway:', {
+                                old: currentFeaturesList,
+                                new: newFeaturesList
+                            });
+                        }
+                        
+                        featuresGrid.innerHTML = gameData.available_features.map(feature => `
+                            <div class="feature-tile" draggable="true" 
+                                 ondragstart="handleDragStart(event, '${feature}')"
+                                 ondragend="handleDragEnd(event)">
+                                ${feature}
+                            </div>
+                        `).join('');
+                    } else {
+                        console.log('Skipping features grid update - dragging and no changes detected');
+                    }
                 }
             }
             
@@ -807,7 +828,14 @@
                     
                     if (board[i]) {
                         slot.classList.add('filled');
-                        slot.textContent = board[i];
+                        slot.innerHTML = `
+                            <div class="feature-content">
+                                <span class="feature-text">${board[i]}</span>
+                                <button onclick="removeFeature('${board[i]}')" 
+                                        class="remove-button"
+                                        title="Remove ${board[i]} and return to pool">×</button>
+                            </div>
+                        `;
                     } else {
                         slot.textContent = `Slot ${i + 1}`;
                     }
@@ -851,6 +879,8 @@
                 console.error('botPlayersContainer element not found!');
             }
         }
+
+        // Remove the helper function since we're not using the complete skip approach anymore
 
         function updateResultsView() {
             if (!gameData) return;
@@ -978,7 +1008,43 @@
             }
         }
 
-        async function stealFeature(sourcePlayerId, feature, targetSlot) {
+        async function removeFeature(feature) {
+            if (!gameId || !playerId || gameState !== 'building') return;
+            
+            console.log(`Attempting to remove feature: ${feature}`);
+            
+            try {
+                const response = await apiCall('/game/build', {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        gameId,
+                        playerId,
+                        action: 'remove',
+                        feature
+                    })
+                });
+                
+                console.log(`Feature ${feature} removed successfully:`, response);
+                showNotification(`${feature} returned to pool`, 'success');
+                
+                // Force immediate update to see the change
+                setTimeout(async () => {
+                    try {
+                        const status = await apiCall(`/game/status?gameId=${gameId}`);
+                        gameData = status;
+                        currentPlayer = status.players.find(p => p.id === playerId);
+                        updateBuildingView();
+                        console.log('Forced update after feature removal');
+                    } catch (error) {
+                        console.error('Error in forced update:', error);
+                    }
+                }, 100);
+                
+            } catch (error) {
+                console.error('Failed to remove feature:', error);
+                showNotification('Failed to remove feature. Please try again.', 'error');
+            }
+        }
             if (!gameId || !playerId || gameState !== 'building') return;
             
             try {
@@ -1005,6 +1071,15 @@
 
         function handleDragStart(event, feature, sourcePlayerId = null) {
             isDragging = true;
+            draggedFeature = feature; // Track the dragged feature
+            
+            console.log(`Drag started for feature: ${feature}, from player: ${sourcePlayerId || 'pool'}`);
+            
+            // Safety timeout - force end drag after 10 seconds to prevent game blocking
+            dragTimeout = setTimeout(() => {
+                console.warn('Drag operation timed out after 10 seconds - forcing end');
+                handleDragEnd({ target: event.target });
+            }, 10000);
             
             event.dataTransfer.setData('text/plain', feature);
             if (sourcePlayerId) {
@@ -1021,7 +1096,16 @@
         }
 
         function handleDragEnd(event) {
+            console.log(`Drag ended for feature: ${draggedFeature}`);
+            
+            // Clear the safety timeout
+            if (dragTimeout) {
+                clearTimeout(dragTimeout);
+                dragTimeout = null;
+            }
+            
             isDragging = false;
+            draggedFeature = null; // Clear the tracked feature
             event.target.classList.remove('dragging');
             
             const allBoardSlots = document.querySelectorAll('.board-slot');
@@ -1718,6 +1802,45 @@
             border: 2px solid #28a745;
             background: #f8fff8;
             color: #333;
+            padding: 10px;
+            position: relative;
+        }
+
+        .remove-button {
+            background: #ff4444 !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 50% !important;
+            width: 22px !important;
+            height: 22px !important;
+            font-size: 14px !important;
+            font-weight: bold !important;
+            cursor: pointer !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            transition: all 0.2s ease !important;
+            flex-shrink: 0 !important;
+        }
+
+        .remove-button:hover {
+            background: #cc0000 !important;
+            transform: scale(1.1) !important;
+        }
+
+        .feature-content {
+            display: flex !important;
+            justify-content: space-between !important;
+            align-items: center !important;
+            width: 100% !important;
+            gap: 8px !important;
+        }
+
+        .feature-text {
+            flex: 1 !important;
+            text-align: center !important;
+            font-size: 0.9rem !important;
+            line-height: 1.2 !important;
         }
 
         .board-slot.can-drop {
