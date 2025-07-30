@@ -45,6 +45,9 @@ const BOT_NAMES = [
   'FeatureFinder', 'BuildMaster', 'TrendSpotter', 'UserVoice', 'QualityBot'
 ];
 
+// Admin password (in production, this should be in environment variables)
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'admin123';
+
 function generateGameId() {
   return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
 }
@@ -158,6 +161,18 @@ exports.handler = async (event, context) => {
       case '/game/cursor':
         return await updateCursor(body);
       
+      case '/admin/login':
+        return await adminLogin(body);
+      
+      case '/admin/features':
+        return await handleAdminFeatures(method, body, event.headers);
+      
+      case '/admin/download':
+        return await downloadGameData(event.headers);
+      
+      case '/admin/feature-scores':
+        return await downloadFeatureScores(event.headers);
+      
       default:
         console.log('Route not found:', path);
         return { 
@@ -178,6 +193,204 @@ exports.handler = async (event, context) => {
     };
   }
 };
+
+// Admin functions
+async function adminLogin(body) {
+  try {
+    const { password } = body;
+    
+    if (password === ADMIN_PASSWORD) {
+      // In production, use proper JWT tokens
+      const token = 'admin_' + Date.now();
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({ token })
+      };
+    } else {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({ error: 'Invalid password' })
+      };
+    }
+  } catch (error) {
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Login failed' })
+    };
+  }
+}
+
+async function handleAdminFeatures(method, body, requestHeaders) {
+  // Simple auth check
+  const authHeader = requestHeaders.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer admin_')) {
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({ error: 'Unauthorized' })
+    };
+  }
+  
+  if (method === 'GET') {
+    // Return current features
+    return {
+      statusCode: 200,
+      headers,
+      body: JSON.stringify(AVAILABLE_FEATURES.map((feature, index) => ({
+        id: index,
+        name: feature,
+        category: getFeatureCategory(feature)
+      })))
+    };
+  }
+  
+  // For POST/PUT/DELETE, you could implement feature management
+  // For now, return the current features as read-only
+  return {
+    statusCode: 200,
+    headers,
+    body: JSON.stringify({ message: 'Feature management coming soon' })
+  };
+}
+
+function getFeatureCategory(feature) {
+  const categories = {
+    'Premium Materials': 'Design',
+    'Wireless Connectivity': 'Technology',
+    'Voice Control': 'Technology',
+    'Mobile App': 'Technology',
+    'Energy Efficient': 'Performance',
+    'Compact Design': 'Design',
+    'Touch Screen': 'Technology',
+    'Auto Updates': 'Technology',
+    'Cloud Storage': 'Technology',
+    'AI Assistant': 'Technology',
+    '24/7 Support': 'Support',
+    'Warranty Plus': 'Support',
+    'Fast Charging': 'Performance',
+    'Water Resistant': 'Design',
+    'Customizable': 'Design',
+    'Smart Integration': 'Technology',
+    'Eco Friendly': 'Sustainability',
+    'Professional Grade': 'Performance',
+    'User Friendly': 'Design',
+    'Advanced Security': 'Technology'
+  };
+  return categories[feature] || 'Other';
+}
+
+async function downloadGameData(requestHeaders) {
+  // Simple auth check
+  const authHeader = requestHeaders.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer admin_')) {
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({ error: 'Unauthorized' })
+    };
+  }
+  
+  try {
+    const { data: games, error } = await supabase
+      .from('product_games')
+      .select('*')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    // Generate CSV
+    let csv = 'Game ID,Player Name,Is Bot,Panel ID,Score,Features,Conjoint Choice,Game Stage,Created At\n';
+    
+    games.forEach(game => {
+      if (game.players) {
+        game.players.forEach(player => {
+          const features = player.board ? player.board.join(';') : '';
+          csv += `"${game.id}","${player.name}","${player.is_bot}","${player.panel_id || ''}","${player.score || 0}","${features}","${player.conjoint_choice || ''}","${game.stage}","${game.created_at}"\n`;
+        });
+      }
+    });
+    
+    return {
+      statusCode: 200,
+      headers: {
+        ...headers,
+        'Content-Type': 'text/csv',
+        'Content-Disposition': 'attachment; filename="product_builder_data.csv"'
+      },
+      body: csv
+    };
+  } catch (error) {
+    console.error('Error downloading game data:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to download data' })
+    };
+  }
+}
+
+async function downloadFeatureScores(requestHeaders) {
+  // Simple auth check
+  const authHeader = requestHeaders.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer admin_')) {
+    return {
+      statusCode: 401,
+      headers,
+      body: JSON.stringify({ error: 'Unauthorized' })
+    };
+  }
+  
+  try {
+    const { data: games, error } = await supabase
+      .from('product_games')
+      .select('*')
+      .eq('stage', 'completed')
+      .order('created_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    // Generate feature scores CSV
+    let csv = 'Game ID,Player Name,Panel ID,Feature,Feature Score,Total Player Score,Game Date\n';
+    
+    games.forEach(game => {
+      if (game.players && game.feature_stats) {
+        const realPlayers = game.players.filter(p => !p.is_bot);
+        
+        realPlayers.forEach(player => {
+          if (player.board && player.board.length > 0) {
+            player.board.forEach(feature => {
+              const featureStats = game.feature_stats[feature];
+              // New scoring: only building selections count (no conjoint bonus)
+              const featureScore = featureStats ? featureStats.build_selections * 5 : 0;
+              
+              csv += `"${game.id}","${player.name}","${player.panel_id || ''}","${feature}","${featureScore}","${player.score || 0}","${game.created_at}"\n`;
+            });
+          }
+        });
+      }
+    });
+    
+    return {
+      statusCode: 200,
+      headers: {
+        ...headers,
+        'Content-Type': 'text/csv',
+        'Content-Disposition': 'attachment; filename="feature_scores.csv"'
+      },
+      body: csv
+    };
+  } catch (error) {
+    console.error('Error downloading feature scores:', error);
+    return {
+      statusCode: 500,
+      headers,
+      body: JSON.stringify({ error: 'Failed to download feature scores' })
+    };
+  }
+}
 
 // Game functions
 async function joinGame(body) {
@@ -533,8 +746,8 @@ async function progressGame(body) {
         shouldUpdate = true;
       }
       
-      // Make bots build features and move cursors every few seconds, but only after 5 seconds
-      if (timeSinceBuilding >= 5 && timeSinceBuilding % 3 === 0) {
+      // UPDATED BOT BEHAVIOR: Make bots build features and move cursors, but steal much less frequently
+      if (timeSinceBuilding >= 5 && timeSinceBuilding % 5 === 0) { // Changed from every 4 seconds to every 5
         const players = [...game.players];
         const availableFeatures = [...game.available_features];
         const featureStats = { ...game.feature_stats };
@@ -551,10 +764,10 @@ async function progressGame(body) {
             };
             
             if (player.board.length < 4) {
-              // 70% chance bot takes action this cycle
-              if (Math.random() < 0.7) {
-                // 80% chance to take from pool, 20% chance to steal
-                if (Math.random() < 0.8 && availableFeatures.length > 0) {
+              // CHANGED: 50% chance bot takes action this cycle (down from 60%)
+              if (Math.random() < 0.5) {
+                // CHANGED: 98% chance to take from pool, only 2% chance to steal (was 95/5)
+                if (Math.random() < 0.98 && availableFeatures.length > 0) {
                   // Take from pool
                   const featureIndex = Math.floor(Math.random() * availableFeatures.length);
                   const feature = availableFeatures.splice(featureIndex, 1)[0];
@@ -573,7 +786,7 @@ async function progressGame(body) {
                   botsActed = true;
                   console.log(`Bot ${player.name} took ${feature} from pool`);
                 } else {
-                  // Try to steal
+                  // Try to steal (very rare now)
                   const playersWithFeatures = players.filter(p => p.id !== player.id && p.board.length > 0);
                   if (playersWithFeatures.length > 0) {
                     const targetPlayer = playersWithFeatures[Math.floor(Math.random() * playersWithFeatures.length)];
@@ -613,7 +826,7 @@ async function progressGame(body) {
       if (newRoundTimer <= 0) {
         console.log('Building timer expired, ending game');
         
-        // Calculate final scores
+        // Calculate final scores - UPDATED SCORING: No conjoint bonus, only building selections
         const players = game.players.map(player => {
           let score = 0;
           
@@ -621,7 +834,8 @@ async function progressGame(body) {
             player.board.forEach(feature => {
               if (game.feature_stats[feature]) {
                 const stats = game.feature_stats[feature];
-                score += (stats.conjoint_selections * 10) + (stats.build_selections * 5);
+                // CHANGED: Only count build selections (no conjoint bonus)
+                score += stats.build_selections * 5;
               }
             });
           }
@@ -882,3 +1096,4 @@ async function updateCursor(body) {
     };
   }
 }
+        

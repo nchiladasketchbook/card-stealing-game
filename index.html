@@ -1216,6 +1216,8 @@
             opacity: 0;
             visibility: hidden;
             transition: all 0.5s ease;
+            padding: 20px;
+            box-sizing: border-box;
         }
 
         .results-overlay.visible {
@@ -1228,10 +1230,14 @@
             border-radius: 20px;
             padding: 40px;
             max-width: 600px;
-            width: 90%;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
             text-align: center;
             transform: scale(0.8);
             transition: transform 0.5s ease;
+            position: relative;
+            margin: auto;
         }
 
         .results-overlay.visible .results-content {
