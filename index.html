@@ -138,20 +138,7 @@
                 return;
             }
             
-            // Only show cursors after 5 seconds into building stage
-            const buildingStartTime = gameData.building_start_time ? new Date(gameData.building_start_time).getTime() : Date.now();
-            const timeSinceBuilding = Math.floor((Date.now() - buildingStartTime) / 1000);
-            
-            if (timeSinceBuilding < 5) {
-                // Hide all cursors during first 5 seconds
-                for (const [playerId, cursorElement] of cursors) {
-                    if (cursorElement.parentNode) {
-                        cursorElement.style.display = 'none';
-                    }
-                }
-                return;
-            }
-            
+            // Show cursors immediately when building stage starts (removed 5-second delay)
             const now = Date.now();
             
             gameData.players.forEach(player => {
@@ -178,7 +165,7 @@
                     cursors.set(player.id, cursorElement);
                 }
                 
-                // Show cursor after 5 seconds
+                // Show cursor immediately
                 cursorElement.style.display = 'block';
                 cursorElement.style.left = cursor.x + 'px';
                 cursorElement.style.top = cursor.y + 'px';
@@ -811,6 +798,7 @@
                 }
             }
             
+            // FIXED: Show bot players immediately when building stage starts
             const botPlayersContainer = document.getElementById('botPlayersContainer');
             if (botPlayersContainer && gameData.players) {
                 const otherPlayers = gameData.players.filter(p => p.id !== playerId);
