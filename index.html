@@ -641,8 +641,11 @@
                                     break;
                                 case 'building':
                                     showView('buildingView');
-                                    // Force immediate update to show bots
-                                    updateBuildingView();
+                                    // Force immediate update to show bots and current state
+                                    setTimeout(() => {
+                                        updateBuildingView();
+                                        console.log('Building view updated with current game data');
+                                    }, 100);
                                     break;
                                 case 'completed':
                                     cleanupCursors();
@@ -672,7 +675,7 @@
                     updateConnectionStatus('disconnected');
                     setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, gameState === 'building' ? 1000 : 1000); // Faster updates during building phase
+            }, gameState === 'building' ? 500 : 1000); // Much faster updates during building phase (0.5 seconds)
         }
 
         function updateLobbyView() {
@@ -757,7 +760,16 @@
         }
 
         function updateBuildingView() {
-            if (!gameData) return;
+            if (!gameData) {
+                console.log('updateBuildingView: No game data available');
+                return;
+            }
+            
+            console.log('updateBuildingView called with:', {
+                players: gameData.players?.length || 0,
+                availableFeatures: gameData.available_features?.length || 0,
+                currentPlayer: currentPlayer?.name || 'unknown'
+            });
             
             const timerEl = document.getElementById('buildingTimer');
             if (timerEl) {
@@ -784,6 +796,8 @@
                 const board = currentPlayer.board || [];
                 playerBoard.innerHTML = '';
                 
+                console.log('Updating player board with:', board);
+                
                 for (let i = 0; i < 4; i++) {
                     const slot = document.createElement('div');
                     slot.className = 'board-slot';
@@ -802,31 +816,39 @@
                 }
             }
             
-            // FIXED: Show bot players immediately when building stage starts
+            // ALWAYS show bot players container, even if empty
             const botPlayersContainer = document.getElementById('botPlayersContainer');
-            if (botPlayersContainer && gameData.players) {
-                const otherPlayers = gameData.players.filter(p => p.id !== playerId);
-                
-                if (otherPlayers.length === 0) {
-                    botPlayersContainer.innerHTML = '<div style="text-align: center; color: #666; grid-column: 1 / -1;">No other players</div>';
+            if (botPlayersContainer) {
+                if (!gameData.players) {
+                    console.log('No players data available yet');
+                    botPlayersContainer.innerHTML = '<div style="text-align: center; color: #666; grid-column: 1 / -1;">Loading other players...</div>';
                 } else {
-                    botPlayersContainer.innerHTML = otherPlayers.map(player => `
-                        <div class="bot-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
-                            <h4 style="margin-bottom: 10px; text-align: center;">${player.name || 'Unknown'} ${player.is_bot ? '🤖' : ''}</h4>
-                            <div class="bot-player-features">
-                                ${Array.from({length: 4}, (_, i) => `
-                                    <div class="feature-slot ${player.board && player.board[i] ? 'filled' : 'empty'}"
-                                         ${player.board && player.board[i] ? 
-                                           `draggable="true" ondragstart="handleDragStart(event, '${player.board[i]}', '${player.id}')" ondragend="handleDragEnd(event)"` : ''}>
-                                        ${player.board && player.board[i] ? player.board[i] : 'Empty'}
-                                    </div>
-                                `).join('')}
+                    const otherPlayers = gameData.players.filter(p => p.id !== playerId);
+                    console.log('Other players found:', otherPlayers.map(p => ({ name: p.name, isBot: p.is_bot, boardLength: p.board?.length || 0 })));
+                    
+                    if (otherPlayers.length === 0) {
+                        botPlayersContainer.innerHTML = '<div style="text-align: center; color: #666; grid-column: 1 / -1;">No other players</div>';
+                    } else {
+                        botPlayersContainer.innerHTML = otherPlayers.map(player => `
+                            <div class="bot-player ${player.board && player.board.length > 0 ? 'has-features' : ''}">
+                                <h4 style="margin-bottom: 10px; text-align: center;">${player.name || 'Unknown'} ${player.is_bot ? '🤖' : ''}</h4>
+                                <div class="bot-player-features">
+                                    ${Array.from({length: 4}, (_, i) => `
+                                        <div class="feature-slot ${player.board && player.board[i] ? 'filled' : 'empty'}"
+                                             ${player.board && player.board[i] ? 
+                                               `draggable="true" ondragstart="handleDragStart(event, '${player.board[i]}', '${player.id}')" ondragend="handleDragEnd(event)"` : ''}>
+                                            ${player.board && player.board[i] ? player.board[i] : 'Empty'}
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                ${player.board && player.board.length > 0 ? 
+                                    '<div class="steal-hint" style="text-align: center;">Click and drag features to steal them!</div>' : ''}
                             </div>
-                            ${player.board && player.board.length > 0 ? 
-                                '<div class="steal-hint" style="text-align: center;">Click and drag features to steal them!</div>' : ''}
-                        </div>
-                    `).join('');
+                        `).join('');
+                    }
                 }
+            } else {
+                console.error('botPlayersContainer element not found!');
             }
         }
 
@@ -921,8 +943,10 @@
         async function addFeatureToBoard(feature, slotIndex = null) {
             if (!gameId || !playerId || gameState !== 'building') return;
             
+            console.log(`Attempting to add feature: ${feature} to slot: ${slotIndex}`);
+            
             try {
-                await apiCall('/game/build', {
+                const response = await apiCall('/game/build', {
                     method: 'POST',
                     body: JSON.stringify({
                         gameId,
@@ -933,9 +957,20 @@
                     })
                 });
                 
-                // Don't update the UI optimistically - wait for server response
-                // This prevents conflicts with bot actions
-                console.log(`Feature ${feature} added successfully`);
+                console.log(`Feature ${feature} added successfully:`, response);
+                
+                // Force immediate update to see the change
+                setTimeout(async () => {
+                    try {
+                        const status = await apiCall(`/game/status?gameId=${gameId}`);
+                        gameData = status;
+                        currentPlayer = status.players.find(p => p.id === playerId);
+                        updateBuildingView();
+                        console.log('Forced update after feature add');
+                    } catch (error) {
+                        console.error('Error in forced update:', error);
+                    }
+                }, 100);
                 
             } catch (error) {
                 console.error('Failed to add feature:', error);
