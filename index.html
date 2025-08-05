@@ -1,3 +1,59 @@
+                <h1 class="game-title">🏗️ Product Builder</h1>
+                <p class="game-subtitle">Market Research Through Competitive Building</p>
+            </div>
+            
+            <!-- Entry Form (Default View) -->
+            <div id="entryView" class="entry-form">
+                <h2 style="text-align: center; margin-bottom: 20px;">Welcome!</h2>
+                
+                <div id="urlInfo" style="display: none; background: rgba(255, 255, 255, 0.2); color: white; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; font-size: 0.9em;"></div>
+                
+                <input type="text" id="playerNameInput" class="form-input" placeholder="Enter your name" autocomplete="off">
+                
+                <button id="joinGameBtn" class="form-button">Join Game</button>
+                
+                <div id="errorMessage" class="error-message" style="display: none;"></div>
+                
+                <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
+                    Enter your name to join the next available game
+                </div>
+            </div>
+
+            <!-- Lobby View -->
+            <div id="lobbyView" class="lobby-screen hidden">
+                <h2 style="font-size: 2em; margin-bottom: 15px;">🎮 Game Lobby</h2>
+                <p id="lobbyStatus" style="font-size: 1.2em; color: #666;">
+                    🕐 Waiting for game to start...
+                </p>
+                <div id="lobbyProgress" class="progress-bar-container" style="margin-top: 20px;">
+                    <div class="progress-bar" style="width: 0%;"></div>
+                </div>
+                
+                <div class="players-list">
+                    <h3 style="margin-bottom: 20px;">Players in Lobby</h3>
+                    <div id="playersContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
+                        <!-- Players will be populated here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Conjoint Stage -->
+            <div id="conjointView" class="game-stage">
+                <div class="stage-header">
+                    <h2 class="stage-title">Stage 1: Product Preference</h2>
+                    <p class="stage-description">Choose which product you would be most likely to buy</p>
+                    <div id="conjointTimer" class="timer">Time remaining: 10s</div>
+                </div>
+
+                <div id="productOptions" class="product-options">
+                    <!-- Product options will be populated here -->
+                </div>
+
+                <div style="text-align: center; margin-top: 30px;">
+                    <button id="submitChoiceBtn" class="form-button" style="max-width: 300px;" disabled>Submit Choice</button>
+                </div>
+            </div>
+
             <!-- Building Stage -->
             <div id="buildingView" class="game-stage">
                 <div class="stage-header">
@@ -75,8 +131,8 @@
         let cursors = new Map();
         let lastCursorUpdate = 0;
         let isDragging = false;
-        let draggedFeature = null; // Track what's being dragged
-        let dragTimeout = null; // Safety timeout for drag operations
+        let draggedFeature = null;
+        let dragTimeout = null;
 
         // DOM Elements helper
         const elements = {
@@ -140,7 +196,6 @@
                 return;
             }
             
-            // Show cursors immediately when building stage starts (removed 5-second delay)
             const now = Date.now();
             
             gameData.players.forEach(player => {
@@ -167,7 +222,6 @@
                     cursors.set(player.id, cursorElement);
                 }
                 
-                // Show cursor immediately
                 cursorElement.style.display = 'block';
                 cursorElement.style.left = cursor.x + 'px';
                 cursorElement.style.top = cursor.y + 'px';
@@ -224,58 +278,70 @@
             cursors.clear();
         }
 
-        function animateFeatureAdd(slotElement) {
-            if (slotElement) {
-                slotElement.classList.add('feature-added');
-                setTimeout(() => {
-                    slotElement.classList.remove('feature-added');
-                }, 500);
-            }
-        }
-
         // Results overlay functions
         function showResultsOverlay() {
             const overlay = elements.resultsOverlay();
             if (!overlay || !currentPlayer || !gameData) return;
             
-            // Calculate feature scores for display
             const playerFeatures = currentPlayer.board || [];
-            const featureScores = playerFeatures.map(feature => {
+            
+            if (playerFeatures.length === 0) {
+                const featureResultsList = document.getElementById('featureResultsList');
+                if (featureResultsList) {
+                    featureResultsList.innerHTML = '<div style="color: #666; font-style: italic;">No features selected</div>';
+                }
+                
+                overlay.classList.add('visible');
+                const overallStars = 1;
+                setTimeout(() => animateTotalScore(overallStars), 500);
+                setTimeout(() => animatePositionBadge(), 1000);
+                setTimeout(() => animateContinueButton(), 1500);
+                return;
+            }
+            
+            const featureRawScores = playerFeatures.map(feature => {
                 const stats = gameData.feature_stats[feature];
-                // New scoring: only building selections count (no conjoint bonus)
-                const score = stats ? stats.build_selections * 5 : 0;
-                const stars = Math.min(5, Math.max(1, Math.ceil(score / 10)));
-                return { feature, score, stars };
+                let estimatedScore = 0;
+                
+                if (stats) {
+                    const hasConjointData = Object.values(gameData.feature_stats).some(s => s.conjoint_selections > 0);
+                    
+                    if (hasConjointData) {
+                        estimatedScore = (stats.build_selections * 5) + (stats.conjoint_selections * 3);
+                    } else {
+                        estimatedScore = stats.build_selections * 5;
+                    }
+                }
+                
+                return { feature, score: estimatedScore };
             });
             
-            // Calculate player position
+            const featureScores = calculateRelativeStars(featureRawScores);
+            
             const sortedPlayers = [...gameData.players].sort((a, b) => (b.score || 0) - (a.score || 0));
             const playerPosition = sortedPlayers.findIndex(p => p.id === playerId) + 1;
             
-            // Calculate overall stars
             const totalScore = currentPlayer.score || 0;
-            const overallStars = Math.min(5, Math.max(1, Math.ceil(totalScore / 20)));
+            const overallStars = Math.min(5, Math.max(1, Math.ceil(totalScore / 15)));
             
-            // Populate feature results
             const featureResultsList = document.getElementById('featureResultsList');
             if (featureResultsList) {
-                if (featureScores.length === 0) {
-                    featureResultsList.innerHTML = '<div style="color: #666; font-style: italic;">No features selected</div>';
-                } else {
-                    featureResultsList.innerHTML = featureScores.map(({ feature, score, stars }) => `
-                        <div class="feature-result-item">
-                            <div class="feature-name-result">${feature}</div>
-                            <div class="feature-stars">
-                                ${Array.from({length: 5}, (_, i) => `
-                                    <span class="feature-star" data-stars="${stars}">${'★'}</span>
-                                `).join('')}
-                            </div>
+                featureResultsList.innerHTML = `
+                    <div style="font-size: 0.9rem; color: #666; margin-bottom: 15px; font-style: italic;">
+                        Features scored based on historical performance across all games
+                    </div>
+                ` + featureScores.map(({ feature, score, stars }) => `
+                    <div class="feature-result-item" data-star-count="${stars}">
+                        <div class="feature-name-result">${feature}</div>
+                        <div class="feature-stars">
+                            ${Array.from({length: 5}, (_, i) => `
+                                <span class="feature-star">★</span>
+                            `).join('')}
                         </div>
-                    `).join('');
-                }
+                    </div>
+                `).join('');
             }
             
-            // Set position badge
             const positionBadge = document.getElementById('positionBadge');
             if (positionBadge) {
                 let positionText = '';
@@ -303,14 +369,54 @@
                 positionBadge.className = `position-badge ${positionClass}`;
             }
             
-            // Show overlay
             overlay.classList.add('visible');
             
-            // Start animations
             setTimeout(() => animateFeatureResults(), 500);
             setTimeout(() => animateTotalScore(overallStars), 2000 + (featureScores.length * 500));
             setTimeout(() => animatePositionBadge(), 3500 + (featureScores.length * 500));
             setTimeout(() => animateContinueButton(), 4500 + (featureScores.length * 500));
+        }
+
+        function calculateRelativeStars(featureRawScores) {
+            if (featureRawScores.length === 0) return [];
+            
+            console.log('Calculating relative stars for features:', featureRawScores);
+            
+            if (featureRawScores.length === 1) {
+                console.log('Only one feature, giving 3 stars');
+                return [{ ...featureRawScores[0], stars: 3 }];
+            }
+            
+            const scores = featureRawScores.map(f => f.score);
+            const minScore = Math.min(...scores);
+            const maxScore = Math.max(...scores);
+            
+            console.log('Score range:', { minScore, maxScore, scores });
+            
+            if (minScore === maxScore) {
+                console.log('All scores are equal, giving all 3 stars');
+                return featureRawScores.map(f => ({ ...f, stars: 3 }));
+            }
+            
+            const result = featureRawScores.map(({ feature, score }) => {
+                let stars;
+                
+                if (score === minScore) {
+                    stars = 1;
+                } else if (score === maxScore) {
+                    stars = 5;
+                } else {
+                    const normalizedScore = (score - minScore) / (maxScore - minScore);
+                    stars = Math.round(1 + (normalizedScore * 4));
+                    stars = Math.max(2, Math.min(4, stars));
+                }
+                
+                console.log(`Feature ${feature}: score=${score}, stars=${stars}`);
+                return { feature, score, stars };
+            });
+            
+            console.log('Final star assignments:', result);
+            return result;
         }
 
         function getOrdinalSuffix(num) {
@@ -329,7 +435,6 @@
                 setTimeout(() => {
                     item.classList.add('animate-in');
                     
-                    // Animate stars for this feature
                     setTimeout(() => {
                         const stars = item.querySelectorAll('.feature-star');
                         const starCount = parseInt(item.dataset.starCount) || 1;
@@ -353,7 +458,6 @@
             if (totalScoreSection) {
                 totalScoreSection.classList.add('animate-in');
                 
-                // Animate total stars
                 setTimeout(() => {
                     const totalStars = document.querySelectorAll('.total-star');
                     totalStars.forEach((star, index) => {
@@ -386,7 +490,6 @@
             if (overlay) {
                 overlay.classList.remove('visible');
                 
-                // Reset all animations
                 setTimeout(() => {
                     const featureItems = document.querySelectorAll('.feature-result-item');
                     const totalScoreSection = document.getElementById('totalScoreSection');
@@ -643,7 +746,6 @@
                                     break;
                                 case 'building':
                                     showView('buildingView');
-                                    // Force immediate update to show bots and current state
                                     setTimeout(() => {
                                         updateBuildingView();
                                         console.log('Building view updated with current game data');
@@ -652,7 +754,6 @@
                                 case 'completed':
                                     cleanupCursors();
                                     clearInterval(updateInterval);
-                                    // Show animated overlay first
                                     showResultsOverlay();
                                     return;
                             }
@@ -677,7 +778,7 @@
                     updateConnectionStatus('disconnected');
                     setTimeout(() => updateConnectionStatus('connected'), 5000);
                 }
-            }, gameState === 'building' ? 500 : 1000); // Much faster updates during building phase (0.5 seconds)
+            }, gameState === 'building' ? 500 : 1000);
         }
 
         function updateLobbyView() {
@@ -784,11 +885,9 @@
                 if (!gameData.available_features || gameData.available_features.length === 0) {
                     featuresGrid.innerHTML = '<div style="text-align: center; color: #666;">No features available</div>';
                 } else {
-                    // SMART UPDATE: Only update if the features have actually changed OR not currently dragging
                     const currentFeaturesList = Array.from(featuresGrid.querySelectorAll('.feature-tile')).map(el => el.textContent.trim());
                     const newFeaturesList = gameData.available_features;
                     
-                    // Check if the feature lists are different
                     const featuresChanged = JSON.stringify(currentFeaturesList.sort()) !== JSON.stringify(newFeaturesList.sort());
                     
                     if (!isDragging || featuresChanged) {
@@ -844,7 +943,6 @@
                 }
             }
             
-            // ALWAYS show bot players container, even if empty
             const botPlayersContainer = document.getElementById('botPlayersContainer');
             if (botPlayersContainer) {
                 if (!gameData.players) {
@@ -879,8 +977,6 @@
                 console.error('botPlayersContainer element not found!');
             }
         }
-
-        // Remove the helper function since we're not using the complete skip approach anymore
 
         function updateResultsView() {
             if (!gameData) return;
@@ -989,7 +1085,6 @@
                 
                 console.log(`Feature ${feature} added successfully:`, response);
                 
-                // Force immediate update to see the change
                 setTimeout(async () => {
                     try {
                         const status = await apiCall(`/game/status?gameId=${gameId}`);
@@ -1027,7 +1122,6 @@
                 console.log(`Feature ${feature} removed successfully:`, response);
                 showNotification(`${feature} returned to pool`, 'success');
                 
-                // Force immediate update to see the change
                 setTimeout(async () => {
                     try {
                         const status = await apiCall(`/game/status?gameId=${gameId}`);
@@ -1045,6 +1139,8 @@
                 showNotification('Failed to remove feature. Please try again.', 'error');
             }
         }
+
+        async function stealFeature(sourcePlayerId, feature, targetSlot) {
             if (!gameId || !playerId || gameState !== 'building') return;
             
             try {
@@ -1060,7 +1156,6 @@
                     })
                 });
                 
-                // Don't update the UI optimistically - wait for server response
                 console.log(`Feature ${feature} stolen successfully`);
                 
             } catch (error) {
@@ -1071,11 +1166,10 @@
 
         function handleDragStart(event, feature, sourcePlayerId = null) {
             isDragging = true;
-            draggedFeature = feature; // Track the dragged feature
+            draggedFeature = feature;
             
             console.log(`Drag started for feature: ${feature}, from player: ${sourcePlayerId || 'pool'}`);
             
-            // Safety timeout - force end drag after 10 seconds to prevent game blocking
             dragTimeout = setTimeout(() => {
                 console.warn('Drag operation timed out after 10 seconds - forcing end');
                 handleDragEnd({ target: event.target });
@@ -1098,14 +1192,13 @@
         function handleDragEnd(event) {
             console.log(`Drag ended for feature: ${draggedFeature}`);
             
-            // Clear the safety timeout
             if (dragTimeout) {
                 clearTimeout(dragTimeout);
                 dragTimeout = null;
             }
             
             isDragging = false;
-            draggedFeature = null; // Clear the tracked feature
+            draggedFeature = null;
             event.target.classList.remove('dragging');
             
             const allBoardSlots = document.querySelectorAll('.board-slot');
@@ -1175,7 +1268,6 @@
 
         function getOverallRating(player) {
             if (!player.board || player.board.length === 0) return 1;
-            // Updated rating calculation based on new scoring system
             const score = player.score || 0;
             return Math.min(5, Math.max(1, Math.ceil(score / 20)));
         }
@@ -1212,7 +1304,6 @@
             }
         }
 
-        // Global error handler
         window.addEventListener('error', function(e) {
             console.error('Global error:', e.error);
             updateConnectionStatus('disconnected');
@@ -1221,7 +1312,7 @@
         document.addEventListener('dragend', handleDragEnd);
     </script>
 </body>
-</html> <!DOCTYPE html>
+</html><!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -2222,61 +2313,4 @@
     <div id="root">
         <div class="container">
             <div class="game-header">
-                <h1 class="game-title">🏗️ Product Builder</h1>
-                <p class="game-subtitle">Market Research Through Competitive Building</p>
-            </div>
-            
-            <!-- Entry Form (Default View) -->
-            <div id="entryView" class="entry-form">
-                <h2 style="text-align: center; margin-bottom: 20px;">Welcome!</h2>
-                
-                <div id="urlInfo" style="display: none; background: rgba(255, 255, 255, 0.2); color: white; padding: 10px; border-radius: 8px; margin-bottom: 15px; text-align: center; font-size: 0.9em;"></div>
-                
-                <input type="text" id="playerNameInput" class="form-input" placeholder="Enter your name" autocomplete="off">
-                
-                <button id="joinGameBtn" class="form-button">Join Game</button>
-                
-                <div id="errorMessage" class="error-message" style="display: none;"></div>
-                
-                <div style="margin-top: 15px; text-align: center; color: #666; font-size: 0.9em;">
-                    Enter your name to join the next available game
-                </div>
-            </div>
-
-            <!-- Lobby View -->
-            <div id="lobbyView" class="lobby-screen hidden">
-                <h2 style="font-size: 2em; margin-bottom: 15px;">🎮 Game Lobby</h2>
-                <p id="lobbyStatus" style="font-size: 1.2em; color: #666;">
-                    🕐 Waiting for game to start...
-                </p>
-                <div id="lobbyProgress" class="progress-bar-container" style="margin-top: 20px;">
-                    <div class="progress-bar" style="width: 0%;"></div>
-                </div>
-                
-                <div class="players-list">
-                    <h3 style="margin-bottom: 20px;">Players in Lobby</h3>
-                    <div id="playersContainer" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px;">
-                        <!-- Players will be populated here -->
-                    </div>
-                </div>
-            </div>
-
-            <!-- Conjoint Stage -->
-            <div id="conjointView" class="game-stage">
-                <div class="stage-header">
-                    <h2 class="stage-title">Stage 1: Product Preference</h2>
-                    <p class="stage-description">Choose which product you would be most likely to buy</p>
-                    <div id="conjointTimer" class="timer">Time remaining: 10s</div>
-                </div>
-
-                <div id="productOptions" class="product-options">
-                    <!-- Product options will be populated here -->
-                </div>
-
-                <div style="text-align: center; margin-top: 30px;">
-                    <button id="submitChoiceBtn" class="form-button" style="max-width: 300px;" disabled>Submit Choice</button>
-                </div>
-            </div>
-
-            <!-- Building Stage -->
-            
+                <h1 class="game-title">
